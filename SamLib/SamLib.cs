@@ -3,7 +3,6 @@
     #region Imports
     using Open.Nat;
     using System.Collections.Concurrent;
-    using System.Formats.Tar;
     using System.Net;
     using System.Net.Sockets;
     using System.Text;
@@ -53,7 +52,7 @@
         public int _port;
         private TcpListener _listener;
         private int _maxClients;
-        public bool started = false;
+        public bool _started = false;
         private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
         private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
         private readonly Channel<(string clientId, byte[] data)> _msgChannel = Channel.CreateUnbounded<(string, byte[])>();
@@ -79,7 +78,7 @@
         /// <returns></returns>
         public async Task WaitForStart()
         {
-            if (started) return;
+            if (_started) return;
             await _startTcs.Task;
         }
 
@@ -114,7 +113,7 @@
             if(doDebug)Console.WriteLine($"Server started on {_port}.");
 
             // Signal started
-            started = true;
+            _started = true;
             _startTcs.TrySetResult(true);
 
             // Server loop
@@ -401,7 +400,7 @@
                     _ = ReceiveLoop();
                     return true;
                 }
-                catch (Exception ex)
+                catch
                 {
                     attempts++;
                     if (doDebug) Console.WriteLine($"Connection failed: Retrying {attempts+1}/{limit}");
