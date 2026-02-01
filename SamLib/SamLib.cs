@@ -95,13 +95,13 @@
         /// <param name="description">Description</param>
         /// <param name="maxAttempts">Max trys of different ports</param>
         /// <returns></returns>
-        public async Task StartServer(string description = "server", int maxAttempts = 5, bool doDebug = true, bool doPortForward = true)
+        public async Task StartServer(string description = "server", int maxAttempts = 5, int delay = 2000, bool doDebug = true, bool doPortForward = true)
         {
             int attempt = 0;
             bool success = false;
             while((!success && (attempt < maxAttempts)) && doPortForward) 
             {
-                success = await PortForward(_port, description, doDebug);
+                success = await PortForward(_port, delay, description, doDebug);
                 if (success) break;
                 attempt++;
                 _port++;
@@ -201,7 +201,7 @@
             }
         }
         
-        private async Task<bool> PortForward(int port, string description = "SamLib Server", bool doDebug = true)
+        private async Task<bool> PortForward(int port, int delay = 2000, string description = "SamLib Server", bool doDebug = true)
         {
             try
             {
@@ -216,7 +216,7 @@
                 }
                 catch { }
 
-                await Task.Delay(3000);
+                await Task.Delay(delay);
 
                 string uniqueDesc = $"{description} {DateTime.Now.Ticks}";
                 await device.CreatePortMapAsync(new Mapping(Protocol.Tcp, port, port, uniqueDesc));
