@@ -1,7 +1,7 @@
 ﻿namespace SamLib.IO
 {
-    using System.Globalization;
     using System.Linq;
+
     // Static IO functions
     public static class IO
     {
@@ -42,7 +42,7 @@
         /// <param name="delay">animated display</param>
         /// <param name="selectedIdentifier">selected option identifier</param>
         /// <returns>Selected string</returns>
-        public static string GetOption(string prompt, string[] options, int delay, string selectedIdentifier = ">")
+        public static string GetOption(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
             bool selected = false;
@@ -62,14 +62,14 @@
                     }
                     else
                     {
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
+                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n", delay);
                     }
                 }
                 else
                 {
                     if (i == index)
                     {
-                        Out($"{selectedIdentifier} {options[i]}\n", delay);
+                        Out($"{selectedIdentifier} {options[i]}", delay);
                     }
                     else
                     {
@@ -91,13 +91,13 @@
                     }
                     else
                     {
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))}  {options[i]}\n");
+                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n");
                     }
                 }
 
-                ConsoleKeyInfo key = Console.ReadKey();
+                ConsoleKeyInfo key = Console.ReadKey(true);
 
-                if(key.Key == ConsoleKey.UpArrow || key.Key == ConsoleKey.W)
+                if (key.Key == ConsoleKey.UpArrow || key.Key == ConsoleKey.W)
                 {
                     index--;
                     if(index < 0) { index = options.Length - 1; }
@@ -120,7 +120,7 @@
         /// <param name="delay">animated display</param>
         /// <param name="selectedIdentifier">selected option identifier</param>
         /// <returns>Selected index</returns>
-        public static int GetOptionIndex(string prompt, string[] options, int delay, string selectedIdentifier = ">")
+        public static int GetOptionIndex(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
             bool selected = false;
@@ -140,14 +140,14 @@
                     }
                     else
                     {
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
+                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n", delay);
                     }
                 }
                 else
                 {
                     if (i == index)
                     {
-                        Out($"{selectedIdentifier} {options[i]}\n", delay);
+                        Out($"{selectedIdentifier} {options[i]}", delay);
                     }
                     else
                     {
@@ -169,11 +169,11 @@
                     }
                     else
                     {
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))}  {options[i]}\n");
+                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n");
                     }
                 }
 
-                ConsoleKeyInfo key = Console.ReadKey();
+                ConsoleKeyInfo key = Console.ReadKey(true);
 
                 if (key.Key == ConsoleKey.UpArrow || key.Key == ConsoleKey.W)
                 {
@@ -194,8 +194,8 @@
         /// <summary>
         /// Display scrollable messages (D and A)
         /// </summary>
-        /// <param name="messages"></param>
-        public static void ScrollDisplay(string[] messages)
+        /// <param name="messages">Messages array</param>
+        public static void HorizontalScrollDisplay(string[] messages)
         {
             int index = 0;
             int cursorY = Console.CursorTop;
@@ -205,21 +205,20 @@
             {
                 Console.SetCursorPosition(0, cursorY);
                 Console.Write(string.Concat(Enumerable.Repeat("  ", messages.OrderByDescending(s => s.Length).FirstOrDefault().Length)));
+                Console.SetCursorPosition(0, cursorY);
                 string head = (index!=0?"< ":"");
                 string tail = (index!=messages.Length-1?" >":"");
                 Console.Write($"{head}{messages[index]}{tail}");
 
-                ConsoleKeyInfo key = Console.ReadKey();
+                ConsoleKeyInfo key = Console.ReadKey(true);
 
                 if (key.Key == ConsoleKey.D || key.Key == ConsoleKey.RightArrow)
                 {
-                    index++;
-                    if (index > messages.Length - 1) { index = 0; }
+                    if (index != messages.Length - 1) { index++; }
                 }
                 else if (key.Key == ConsoleKey.A || key.Key == ConsoleKey.LeftArrow)
                 {
-                    index--;
-                    if (index < 0) { index = messages.Length - 1; }
+                    if (index != 0) { index--; }
                 }
                 else if(key.Key == ConsoleKey.Enter)
                 {
@@ -227,11 +226,81 @@
                 }
             }
         }
-    }
 
-    // Managed IO functions, callbacks, etc.
-    public class IOManager
-    {
+        /// <summary>
+        /// Display scrollable messages (D and A)
+        /// </summary>
+        /// <param name="messages">Messages array</param>
+        /// <returns>Selected string</returns>
+        public static string HorizontalScrollSelect(string[] messages)
+        {
+            int index = 0;
+            int cursorY = Console.CursorTop;
+            bool finished = false;
 
+            while (!finished)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                Console.Write(string.Concat(Enumerable.Repeat("  ", messages.OrderByDescending(s => s.Length).FirstOrDefault().Length)));
+                Console.SetCursorPosition(0, cursorY);
+                string head = (index != 0 ? "< " : "");
+                string tail = (index != messages.Length - 1 ? " >" : "");
+                Console.Write($"{head}{messages[index]}{tail}");
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                if (key.Key == ConsoleKey.D || key.Key == ConsoleKey.RightArrow)
+                {
+                    if (index != messages.Length - 1) { index++; }
+                }
+                else if (key.Key == ConsoleKey.A || key.Key == ConsoleKey.LeftArrow)
+                {
+                    if (index != 0) { index--; }
+                }
+                else if (key.Key == ConsoleKey.Enter)
+                {
+                    finished = true;
+                }
+            }
+            return messages[index];
+        }
+
+        /// <summary>
+        /// Display scrollable messages (D and A)
+        /// </summary>
+        /// <param name="messages">Messages array</param>
+        /// <returns>Selected index</returns>
+        public static int HorizontalScrollSelectIndex(string[] messages)
+        {
+            int index = 0;
+            int cursorY = Console.CursorTop;
+            bool finished = false;
+
+            while (!finished)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                Console.Write(string.Concat(Enumerable.Repeat("  ", messages.OrderByDescending(s => s.Length).FirstOrDefault().Length)));
+                Console.SetCursorPosition(0, cursorY);
+                string head = (index != 0 ? "< " : "");
+                string tail = (index != messages.Length - 1 ? " >" : "");
+                Console.Write($"{head}{messages[index]}{tail}");
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                if (key.Key == ConsoleKey.D || key.Key == ConsoleKey.RightArrow)
+                {
+                    if (index != messages.Length - 1) { index++; }
+                }
+                else if (key.Key == ConsoleKey.A || key.Key == ConsoleKey.LeftArrow)
+                {
+                    if (index != 0) { index--; }
+                }
+                else if (key.Key == ConsoleKey.Enter)
+                {
+                    finished = true;
+                }
+            }
+            return index;
+        }
     }
 }
