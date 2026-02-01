@@ -1,7 +1,7 @@
-﻿using System.ComponentModel.Design;
-
-namespace SamLib.IO
+﻿namespace SamLib.IO
 {
+    using System.Globalization;
+    using System.Linq;
     // Static IO functions
     public static class IO
     {
@@ -14,8 +14,11 @@ namespace SamLib.IO
         /// <param name="delay">delay in ms between character outputs</param>
         /// <param name="newLine">new line after output</param>
         /// <param name="punctuationMultiplier">multiplier for punctuation delay, (delay * puncMutliplier)</param>
-        public static void Out(string message, int delay = 90, bool newLine = true, float punctuationMultiplier = 1.4f)
+        public static void Out(string message, int delay = 90, bool newLine = true, bool showCursor = false, float punctuationMultiplier = 1.4f)
         {
+            bool cursorVisibility = Console.CursorVisible;
+            Console.CursorVisible = showCursor;
+
             if (delay <= 0) { Console.Write(message); }
             else
             {
@@ -28,6 +31,7 @@ namespace SamLib.IO
                 }
             }
             if (newLine) Console.WriteLine();
+            Console.CursorVisible = cursorVisibility;
         }
 
         /// <summary>
@@ -187,6 +191,42 @@ namespace SamLib.IO
             return index;
         }
 
+        /// <summary>
+        /// Display scrollable messages (D and A)
+        /// </summary>
+        /// <param name="messages"></param>
+        public static void ScrollDisplay(string[] messages)
+        {
+            int index = 0;
+            int cursorY = Console.CursorTop;
+            bool finished = false;
+
+            while (!finished)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                Console.Write(string.Concat(Enumerable.Repeat("  ", messages.OrderByDescending(s => s.Length).FirstOrDefault().Length)));
+                string head = (index!=0?"< ":"");
+                string tail = (index!=messages.Length-1?" >":"");
+                Console.Write($"{head}{messages[index]}{tail}");
+
+                ConsoleKeyInfo key = Console.ReadKey();
+
+                if (key.Key == ConsoleKey.D || key.Key == ConsoleKey.RightArrow)
+                {
+                    index++;
+                    if (index > messages.Length - 1) { index = 0; }
+                }
+                else if (key.Key == ConsoleKey.A || key.Key == ConsoleKey.LeftArrow)
+                {
+                    index--;
+                    if (index < 0) { index = messages.Length - 1; }
+                }
+                else if(key.Key == ConsoleKey.Enter)
+                {
+                    finished = true;
+                }
+            }
+        }
     }
 
     // Managed IO functions, callbacks, etc.
