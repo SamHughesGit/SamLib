@@ -39,8 +39,50 @@
                 return null;
             }
         }
+
+        /// <summary>
+        /// Get public IPv4
+        /// </summary>
+        /// <returns>Returns public IPv4</returns>
+        public static async Task<string> GetIPv4()
+        {
+            using var client = new HttpClient();
+            string publicIp = await client.GetStringAsync("https://api.ipify.org");
+            return publicIp.Trim();
+        }
+
+        public static async Task<bool> PortForward(int port, Protocol protocol, int delay = 2000, string description = "SamLib Server", bool doDebug = true)
+        {
+            try
+            {
+                var discoverer = new NatDiscoverer();
+                var cts = new CancellationTokenSource(5000);
+                var device = await discoverer.DiscoverDeviceAsync(PortMapper.Upnp | PortMapper.Pmp, cts);
+
+                try
+                {
+                    await device.DeletePortMapAsync(new Mapping(protocol, port, port, description));
+                    if (doDebug) Console.WriteLine("[NAT] Sent Delete request...");
+                }
+                catch { }
+
+                await Task.Delay(delay);
+
+                string uniqueDesc = $"{description} {DateTime.Now.Ticks}";
+                await device.CreatePortMapAsync(new Mapping(protocol, port, port, uniqueDesc));
+                if (doDebug) Console.WriteLine($"[NAT] Port {port} forwarded successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (doDebug) Console.WriteLine($"[NAT Error] {ex.Message}");
+                return false;
+            }
+        }
+
     }
 
+    #region TCP
     public class NetServer
     {
         private class ConnectedClient
@@ -53,6 +95,8 @@
         private TcpListener _listener;
         private int _maxClients;
         public bool _started = false;
+        public bool _doDebug = false;
+
         private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
         private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
         private readonly Channel<(string clientId, byte[] data)> _msgChannel = Channel.CreateUnbounded<(string, byte[])>();
@@ -66,10 +110,11 @@
         public Action<string> OnClientDisconnected { get; set; }
 
         // Constructor
-        public NetServer(int port = 8080, int maxClients = 1)
+        public NetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
         {
             this._port = port;
             this._maxClients = maxClients;
+            this._doDebug = doDebug;
         }
 
         /// <summary>
@@ -86,7 +131,7 @@
         /// Get server ip + port
         /// </summary>
         /// <returns></returns>
-        public async Task<string> GetServerAddress() => $"{await GetIPv4()}:{_port}";
+        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4()}:{_port}";
 
         /// <summary>
         /// Starts the server
@@ -94,13 +139,13 @@
         /// <param name="description">Description</param>
         /// <param name="maxAttempts">Max trys of different ports</param>
         /// <returns></returns>
-        public async Task StartServer(string description = "server", int maxAttempts = 5, int delay = 2000, bool doDebug = true, bool doPortForward = true)
+        public async Task StartServer(string description = "server", int maxAttempts = 5, int delay = 2000, bool doPortForward = true)
         {
             int attempt = 0;
             bool success = false;
-            while((!success && (attempt < maxAttempts)) && doPortForward) 
+            while ((!success && (attempt < maxAttempts)) && doPortForward)
             {
-                success = await PortForward(_port, delay, description, doDebug);
+                success = await Helper.PortForward(_port, Protocol.Tcp, delay, description);
                 if (success) break;
                 attempt++;
                 _port++;
@@ -110,7 +155,7 @@
             _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _listener.Start();
 
-            if(doDebug)Console.WriteLine($"Server started on {_port}.");
+            if (_doDebug) Console.WriteLine($"Server started on {_port}.");
 
             // Signal started
             _started = true;
@@ -124,7 +169,7 @@
 
                 if (_clients.Count >= _maxClients)
                 {
-                    if (doDebug) Console.WriteLine("Server full. Rejecting connection.");
+                    if (_doDebug) Console.WriteLine("Server full. Rejecting connection.");
                     client.Close();
                     continue;
                 }
@@ -135,7 +180,7 @@
                     MessageQueue = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(100)
                     {
                         FullMode = BoundedChannelFullMode.DropOldest,
-                        SingleReader = false, 
+                        SingleReader = false,
                         SingleWriter = true
                     })
                 };
@@ -146,24 +191,13 @@
                 {
                     OnClientConnected?.Invoke(clientId);
                     _connectionChannel.Writer.TryWrite(clientId);
-                    if (doDebug) Console.WriteLine($"Client connected: {clientId}. Total: {_clients.Count}");
-                    _ = HandleClientAsync(clientId, clientInfo, doDebug);
+                    if (_doDebug) Console.WriteLine($"Client connected: {clientId}. Total: {_clients.Count}");
+                    _ = HandleClientAsync(clientId, clientInfo);
                 }
             }
         }
 
-        /// <summary>
-        /// Get public IPv4
-        /// </summary>
-        /// <returns>Returns public IPv4</returns>
-        public async Task<string> GetIPv4()
-        {
-            using var client = new HttpClient();
-            string publicIp = await client.GetStringAsync("https://api.ipify.org");
-            return publicIp.Trim();
-        }
-
-        private async Task HandleClientAsync(string clientId, ConnectedClient clientInfo, bool doDebug = true)
+        private async Task HandleClientAsync(string clientId, ConnectedClient clientInfo)
         {
             try
             {
@@ -181,7 +215,7 @@
             }
             catch (Exception ex)
             {
-                if (doDebug) Console.WriteLine($"Error with client {clientId}: {ex.Message}");
+                if (_doDebug) Console.WriteLine($"Error with client {clientId}: {ex.Message}");
             }
             finally
             {
@@ -195,37 +229,8 @@
                     removedClient = null;
                 }
 
-                if (doDebug) Console.WriteLine($"Client disconnected: {clientId}.");
+                if (_doDebug) Console.WriteLine($"Client disconnected: {clientId}.");
                 OnClientDisconnected?.Invoke(clientId);
-            }
-        }
-        
-        private async Task<bool> PortForward(int port, int delay = 2000, string description = "SamLib Server", bool doDebug = true)
-        {
-            try
-            {
-                var discoverer = new NatDiscoverer();
-                var cts = new CancellationTokenSource(5000);
-                var device = await discoverer.DiscoverDeviceAsync(PortMapper.Upnp | PortMapper.Pmp, cts);
-
-                try
-                {
-                    await device.DeletePortMapAsync(new Mapping(Protocol.Tcp, port, port, description));
-                    if (doDebug) Console.WriteLine("[NAT] Sent Delete request...");
-                }
-                catch { }
-
-                await Task.Delay(delay);
-
-                string uniqueDesc = $"{description} {DateTime.Now.Ticks}";
-                await device.CreatePortMapAsync(new Mapping(Protocol.Tcp, port, port, uniqueDesc));
-                if (doDebug) Console.WriteLine($"[NAT] Port {port} forwarded successfully.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                if (doDebug) Console.WriteLine($"[NAT Error] {ex.Message}");
-                return false;
             }
         }
 
@@ -338,7 +343,7 @@
         /// <returns></returns>
         public async Task ListClient()
         {
-            foreach(KeyValuePair<string, ConnectedClient> pair in _clients)
+            foreach (KeyValuePair<string, ConnectedClient> pair in _clients)
             {
                 Console.WriteLine(pair.Key);
             }
@@ -361,6 +366,7 @@
         private readonly string _hostname;
         private readonly int _port;
         private bool _isConnected;
+        private bool _doDebug = false;
 
         private readonly Channel<byte[]> _msgChannel = Channel.CreateUnbounded<byte[]>();
 
@@ -369,22 +375,23 @@
         public Action OnConnected { get; set; }
         public Action OnDisconnected { get; set; }
 
-        public NetClient(string hostname = "127.0.0.1", int port = 8080)
+        public NetClient(string hostname = "127.0.0.1", int port = 8080, bool doDebug = false)
         {
             _hostname = hostname;
             _port = port;
+            _doDebug = doDebug;
         }
 
         /// <summary>
         /// Connects to the given server
         /// </summary>
         /// <returns>true/false</returns>
-        public async Task<bool> Connect(bool allowRetry = false, int maxRetry = 1, bool doDebug = false)
+        public async Task<bool> Connect(bool allowRetry = false, int maxRetry = 1)
         {
             int attempts = 0;
             int limit = allowRetry ? maxRetry : 1;
 
-            while(attempts < limit)
+            while (attempts < limit)
             {
                 try
                 {
@@ -403,7 +410,7 @@
                 catch
                 {
                     attempts++;
-                    if (doDebug) Console.WriteLine($"Connection failed: Retrying {attempts+1}/{limit}");
+                    if (_doDebug) Console.WriteLine($"Connection failed: Retrying {attempts + 1}/{limit}");
                     if (attempts < limit) await Task.Delay(1000);
                 }
             }
@@ -489,7 +496,7 @@
         /// <summary>
         /// Disconnects from the server
         /// </summary>
-        public void Disconnect(bool doDebug = true)
+        public void Disconnect()
         {
             if (!_isConnected) return;
 
@@ -498,7 +505,8 @@
             _client?.Dispose();
 
             OnDisconnected?.Invoke();
-            if(doDebug) Console.WriteLine("Disconnected from server.");
+            if (_doDebug) Console.WriteLine("Disconnected from server.");
         }
     }
+    #endregion
 }
