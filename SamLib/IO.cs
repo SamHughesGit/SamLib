@@ -1,6 +1,5 @@
 ﻿namespace SamLib.IO
 {
-    using System.Drawing;
     using System.Linq;
 
     // Static IO functions

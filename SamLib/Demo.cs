@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace SamLib.Demo
+﻿namespace SamLib.Demo
 {
     /// <summary>
     /// Rock paper scissors
