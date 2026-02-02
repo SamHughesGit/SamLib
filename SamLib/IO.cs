@@ -1,5 +1,6 @@
 ﻿namespace SamLib.IO
 {
+    using System.Drawing;
     using System.Linq;
 
     // Static IO functions
@@ -42,12 +43,13 @@
         /// <param name="delay">animated display</param>
         /// <param name="selectedIdentifier">selected option identifier</param>
         /// <returns>Selected string</returns>
-        public static string GetOption(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">")
+        public static string GetOption(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
         {
             int index = 0;
             bool selected = false;
             int cursorY = Console.CursorTop;
             Console.CursorVisible = false;
+            ConsoleColor baseColor = Console.ForegroundColor;
 
             Console.SetCursorPosition(0, cursorY);
             if (delay <= 0) { Console.Write($"{prompt}\n"); } else { Out(prompt, delay); }
@@ -58,10 +60,12 @@
                 {
                     if (i == index)
                     {
+                        if (colored) Console.ForegroundColor = color;
                         Console.Write($"{selectedIdentifier} {options[i]}\n", delay);
                     }
                     else
                     {
+                        if (colored) Console.ForegroundColor = baseColor;
                         Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n", delay);
                     }
                 }
@@ -69,10 +73,12 @@
                 {
                     if (i == index)
                     {
+                        if (colored) Console.ForegroundColor = color;
                         Out($"{selectedIdentifier} {options[i]}", delay);
                     }
                     else
                     {
+                        if (colored) Console.ForegroundColor = baseColor;
                         Out($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
                     }
                 }
@@ -80,6 +86,7 @@
 
             while (!selected)
             {
+                if (colored) Console.ForegroundColor = baseColor;
                 Console.SetCursorPosition(0, cursorY);
                 Console.Write($"{prompt}\n");
 
@@ -87,10 +94,12 @@
                 {
                     if (i == index)
                     {
+                        if (colored) Console.ForegroundColor = color;
                         Console.Write($"{selectedIdentifier} {options[i]}\n");
                     }
                     else
                     {
+                        if (colored) Console.ForegroundColor = baseColor;
                         Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n");
                     }
                 }
