@@ -82,7 +82,7 @@
     }
 
     #region TCP
-    public class NetServer
+    public class TcpNetServer
     {
         private class ConnectedClient
         {
@@ -109,7 +109,7 @@
         public Action<string> OnClientDisconnected { get; set; }
 
         // Constructor
-        public NetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
+        public TcpNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
         {
             this._port = port;
             this._maxClients = maxClients;
@@ -358,7 +358,7 @@
         }
     }
 
-    public class NetClient
+    public class TcpNetClient
     {
         private TcpClient _client;
         private NetworkStream _stream;
@@ -374,7 +374,7 @@
         public Action OnConnected { get; set; }
         public Action OnDisconnected { get; set; }
 
-        public NetClient(string hostname = "127.0.0.1", int port = 8080, bool doDebug = false)
+        public TcpNetClient(string hostname = "127.0.0.1", int port = 8080, bool doDebug = false)
         {
             _hostname = hostname;
             _port = port;
@@ -510,7 +510,7 @@
     #endregion
 
     #region UDP
-    public class UDPNetServer
+    public class UdpNetServer
     {
         private class ConnectedClient
         {
@@ -534,7 +534,7 @@
         public Action<string> OnClientConnected { get; set; }
         public Action<string> OnClientDisconnected { get; set; }
 
-        public UDPNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
+        public UdpNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
         {
             this._port = port;
             this._maxClients = maxClients;
