@@ -79,7 +79,6 @@
                 return false;
             }
         }
-
     }
 
     #region TCP
@@ -502,6 +501,380 @@
 
             _isConnected = false;
             _stream?.Dispose();
+            _client?.Dispose();
+
+            OnDisconnected?.Invoke();
+            if (_doDebug) Console.WriteLine("Disconnected from server.");
+        }
+    }
+    #endregion
+
+    #region UDP
+    public class UDPNetServer
+    {
+        private class ConnectedClient
+        {
+            public IPEndPoint EndPoint { get; set; }
+            public Channel<byte[]> MessageQueue { get; set; }
+            public DateTime LastHeartbeat { get; set; } 
+        }
+
+        public int _port;
+        private UdpClient _udpListener;
+        private int _maxClients;
+        public bool _started = false;
+        public bool _doDebug = false;
+
+        private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
+        private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
+        private readonly Channel<(string clientId, byte[] data)> _msgChannel = Channel.CreateUnbounded<(string, byte[])>();
+        private readonly Channel<string> _connectionChannel = Channel.CreateUnbounded<string>();
+
+        public Action<string, byte[]> OnMessageReceived { get; set; }
+        public Action<string> OnClientConnected { get; set; }
+        public Action<string> OnClientDisconnected { get; set; }
+
+        public UDPNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
+        {
+            this._port = port;
+            this._maxClients = maxClients;
+            this._doDebug = doDebug;
+        }
+
+        public async Task WaitForStart()
+        {
+            if (_started) return;
+            await _startTcs.Task;
+        }
+
+        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4()}:{_port}";
+
+        public async Task StartServer(string description = "udp_server", int maxAttempts = 5, int delay = 2000, bool doPortForward = true)
+        {
+            int attempt = 0;
+            bool success = false;
+
+            // Try port forwarding 
+            while ((!success && (attempt < maxAttempts)) && doPortForward)
+            {
+                success = await Helper.PortForward(_port, Protocol.Udp, delay, description);
+                if (success) break;
+                attempt++;
+                _port++;
+            }
+
+            try
+            {
+                _udpListener = new UdpClient(_port);
+
+                // Fix for Windows UDP socket error 10054 (ConnectionReset) when a client closes unexpectedly
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    _udpListener.Client.IOControl((IOControlCode)(-1744830452), new byte[] { 0, 0, 0, 0 }, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_doDebug) Console.WriteLine($"Failed to bind UDP: {ex.Message}");
+                return;
+            }
+
+            if (_doDebug) Console.WriteLine($"UDP Server started on {_port}.");
+
+            _started = true;
+            _startTcs.TrySetResult(true);
+
+            // Start the receive loop
+            _ = ReceiveLoop();
+            _ = ClientCleanupLoop();
+        }
+
+        private async Task ReceiveLoop()
+        {
+            while (true)
+            {
+                try
+                {
+                    var result = await _udpListener.ReceiveAsync();
+                    byte[] data = result.Buffer;
+                    IPEndPoint remoteEndPoint = result.RemoteEndPoint;
+                    string clientId = remoteEndPoint.ToString();
+
+                    // Check if existing client
+                    if (!_clients.TryGetValue(clientId, out var clientInfo))
+                    {
+                        // New Client
+                        if (_clients.Count >= _maxClients)
+                        {
+                            if (_doDebug) Console.WriteLine($"Server full. Ignoring packet from {clientId}.");
+                            continue;
+                        }
+
+                        clientInfo = new ConnectedClient
+                        {
+                            EndPoint = remoteEndPoint,
+                            MessageQueue = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(100)
+                            {
+                                FullMode = BoundedChannelFullMode.DropOldest,
+                                SingleReader = false,
+                                SingleWriter = true
+                            })
+                        };
+
+                        if (_clients.TryAdd(clientId, clientInfo))
+                        {
+                            OnClientConnected?.Invoke(clientId);
+                            _connectionChannel.Writer.TryWrite(clientId);
+                            if (_doDebug) Console.WriteLine($"Client connected (UDP): {clientId}. Total: {_clients.Count}");
+                        }
+                    }
+
+                    // Process Data
+                    if (data.Length > 0)
+                    {
+                        NotifyMessageReceived(clientId, data);
+                        await clientInfo.MessageQueue.Writer.WriteAsync(data);
+                    }
+
+                    clientInfo.LastHeartbeat = DateTime.UtcNow;
+                }
+                catch (ObjectDisposedException)
+                {
+                    break; // Server stopped
+                }
+                catch (Exception ex)
+                {
+                    if (_doDebug) Console.WriteLine($"UDP Receive Error: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task ClientCleanupLoop()
+        {
+            while (_started)
+            {
+                await Task.Delay(5000); 
+                var now = DateTime.UtcNow;
+                var timeout = TimeSpan.FromSeconds(10); 
+
+                foreach (var client in _clients)
+                {
+                    if (now - client.Value.LastHeartbeat > timeout)
+                    {
+                        if (_clients.TryRemove(client.Key, out var removed))
+                        {
+                            if (_doDebug) Console.WriteLine($"Client timed out: {client.Key}");
+                            OnClientDisconnected?.Invoke(client.Key);
+                            removed.MessageQueue.Writer.TryComplete();
+                        }
+                    }
+                }
+            }
+        }
+
+        public async Task Broadcast(string message)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            foreach (var clientInfo in _clients.Values)
+            {
+                await _udpListener.SendAsync(data, data.Length, clientInfo.EndPoint);
+            }
+        }
+
+        public async Task<bool> SendToClient(string clientId, string message)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            return await SendToClient(clientId, data);
+        }
+
+        public async Task<bool> SendToClient(string clientId, byte[] data)
+        {
+            if (_clients.TryGetValue(clientId, out var clientInfo))
+            {
+                try
+                {
+                    await _udpListener.SendAsync(data, data.Length, clientInfo.EndPoint);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        public async Task<string> WaitForClientToConnectAsync(CancellationToken ct = default)
+        {
+            return await _connectionChannel.Reader.ReadAsync(ct);
+        }
+
+        private void NotifyMessageReceived(string clientId, byte[] data)
+        {
+            _msgChannel.Writer.TryWrite((clientId, data));
+            OnMessageReceived?.Invoke(clientId, data);
+        }
+
+        public async Task<(string clientId, byte[] data)> WaitForNextMessageAsyncFull()
+        {
+            return await _msgChannel.Reader.ReadAsync();
+        }
+
+        public async Task<string> WaitForNextMessageAsync()
+        {
+            var (client, data) = await _msgChannel.Reader.ReadAsync();
+            return Encoding.UTF8.GetString(data);
+        }
+
+        public async Task<string> WaitForMessageFromClientAsync(string targetClientId)
+        {
+            if (_clients.TryGetValue(targetClientId, out var clientInfo))
+            {
+                byte[] data = await clientInfo.MessageQueue.Reader.ReadAsync();
+                return Encoding.UTF8.GetString(data);
+            }
+            throw new Exception("Client not found.");
+        }
+
+        public async Task ListClient()
+        {
+            foreach (var key in _clients.Keys)
+            {
+                Console.WriteLine(key);
+            }
+        }
+
+        public async Task<List<string>> GetAllClients()
+        {
+            return _clients.Keys.ToList();
+        }
+    }
+
+    public class UdpNetClient
+    {
+        private UdpClient _client;
+        private readonly string _hostname;
+        private readonly int _port;
+        private bool _isConnected;
+        private bool _doDebug = false;
+
+        private readonly Channel<byte[]> _msgChannel = Channel.CreateUnbounded<byte[]>();
+
+        public Action<byte[]> OnMessageReceived { get; set; }
+        public Action OnConnected { get; set; }
+        public Action OnDisconnected { get; set; }
+
+        public UdpNetClient(string hostname = "127.0.0.1", int port = 8080, bool doDebug = false)
+        {
+            _hostname = hostname;
+            _port = port;
+            _doDebug = doDebug;
+        }
+
+        public async Task<bool> Connect(bool allowRetry = false, int maxRetry = 1)
+        {
+            try
+            {
+                _client?.Dispose();
+                _client = new UdpClient();
+
+                // Fix for Windows UDP socket error 10054
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    _client.Client.IOControl((IOControlCode)(-1744830452), new byte[] { 0, 0, 0, 0 }, null);
+                }
+
+                _client.Connect(_hostname, _port);
+
+                _isConnected = true;
+                OnConnected?.Invoke();
+                _ = ReceiveLoop();
+
+                byte[] handshake = Encoding.UTF8.GetBytes("HELLO_SERVER");
+                await Send(handshake);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (_doDebug) Console.WriteLine($"UDP Connect Failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void NotifyMessageReceived(byte[] data)
+        {
+            _msgChannel.Writer.TryWrite(data);
+            OnMessageReceived?.Invoke(data);
+        }
+
+        public async Task<string> WaitForNextMessageAsync()
+        {
+            byte[] data = await _msgChannel.Reader.ReadAsync();
+            return Encoding.UTF8.GetString(data);
+        }
+
+        public async Task<byte[]> WaitForNextMessageAsyncFull()
+        {
+            return await _msgChannel.Reader.ReadAsync();
+        }
+
+        private async Task ReceiveLoop()
+        {
+            try
+            {
+                while (_isConnected)
+                {
+                    // ReceiveAsync waits for a packet from the "Connected" remote host
+                    var result = await _client.ReceiveAsync();
+                    byte[] data = result.Buffer;
+
+                    if (data != null && data.Length > 0)
+                    {
+                        NotifyMessageReceived(data);
+                    }
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Client closed
+            }
+            catch (Exception ex)
+            {
+                if (_doDebug) Console.WriteLine($"UDP Receive Error: {ex.Message}");
+            }
+            finally
+            {
+                Disconnect();
+            }
+        }
+
+        public async Task Send(string message)
+        {
+            if (!_isConnected) return;
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            await Send(data);
+        }
+
+        public async Task Send(byte[] data)
+        {
+            if (!_isConnected) return;
+            try
+            {
+                await _client.SendAsync(data, data.Length);
+            }
+            catch
+            {
+                Disconnect();
+            }
+        }
+
+        public void Disconnect()
+        {
+            if (!_isConnected) return;
+
+            _isConnected = false;
+            _client?.Close();
             _client?.Dispose();
 
             OnDisconnected?.Invoke();
