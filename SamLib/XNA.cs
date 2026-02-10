@@ -168,16 +168,20 @@
     {
         public Texture2D Texture;
         public Color Tint = Color.White;
+        public Vector2 Size; 
 
-        public SpriteComponent(Texture2D texture) => Texture = texture;
+        public SpriteComponent(Texture2D texture = null) => Texture = texture;
 
         public override void Draw(SpriteBatch spriteBatch)
         {
-            spriteBatch.Draw(Texture, Parent.Position, null, Tint,
-                             Parent.Rotation, Vector2.Zero, Parent.Scale, SpriteEffects.None, 0f);
+            Texture2D tex = Texture ?? DebugUtils.GetPixel(spriteBatch.GraphicsDevice);
+
+            Vector2 scale = Texture == null ? Size : Parent.Scale;
+
+            spriteBatch.Draw(tex, Parent.Position, null, Tint,
+                             Parent.Rotation, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }
     }
-
     public struct AnimationClip
     {
         public int Row;
@@ -258,76 +262,19 @@
         }
     }
 
-    // Collision
-    public class BoxCollider : Component
+    // Debug
+    public static class DebugUtils
     {
-        public Vector2 Size;
-        public Vector2 Offset;
-        public bool IsStatic;
-        public bool IsTrigger; 
+        private static Texture2D _pixel;
 
-        public Action<BoxCollider> OnCollision;
-
-        public Rectangle Bounds => new Rectangle(
-            (int)(Parent.Position.X + Offset.X),
-            (int)(Parent.Position.Y + Offset.Y),
-            (int)Size.X,
-            (int)Size.Y
-        );
-
-        public BoxCollider(int width, int height, Vector2? offset = null, bool isTrigger = false)
+        public static Texture2D GetPixel(GraphicsDevice graphics)
         {
-            Size = new Vector2(width, height);
-            Offset = offset ?? Vector2.Zero;
-            IsTrigger = isTrigger;
-        }
-    }
-
-    public static class CollisionSystem
-    {
-        public static void CheckCollisions(List<Entity> entities)
-        {
-            var collidables = entities.Select(e => e.GetComponent<BoxCollider>())
-                                      .Where(c => c != null).ToList();
-
-            for (int i = 0; i < collidables.Count; i++)
+            if (_pixel == null)
             {
-                for (int j = i + 1; j < collidables.Count; j++)
-                {
-                    var a = collidables[i];
-                    var b = collidables[j];
-
-                    if (a.Bounds.Intersects(b.Bounds))
-                    {
-                        ResolveCollision(a, b);
-                    }
-                }
+                _pixel = new Texture2D(graphics, 1, 1);
+                _pixel.SetData(new[] { Color.White });
             }
-        }
-
-        private static void ResolveCollision(BoxCollider a, BoxCollider b)
-        {
-            a.OnCollision?.Invoke(b);
-            b.OnCollision?.Invoke(a);
-
-            if (a.IsTrigger || b.IsTrigger) return;
-
-            if (a.IsStatic && b.IsStatic) return;
-
-            Rectangle intersection = Rectangle.Intersect(a.Bounds, b.Bounds);
-
-            if (intersection.Width < intersection.Height)
-            {
-                float push = intersection.Width;
-                if (a.Parent.Position.X < b.Parent.Position.X) a.Parent.Position.X -= push;
-                else a.Parent.Position.X += push;
-            }
-            else
-            {
-                float push = intersection.Height;
-                if (a.Parent.Position.Y < b.Parent.Position.Y) a.Parent.Position.Y -= push;
-                else a.Parent.Position.Y += push;
-            }
+            return _pixel;
         }
     }
 }
