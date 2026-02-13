@@ -5,6 +5,7 @@
     using System.Collections.Concurrent;
     using System.Net;
     using System.Net.Sockets;
+    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Channels;
     #endregion
@@ -79,6 +80,31 @@
                 return false;
             }
         }
+
+        // Generate unique token for linking Tcp and Udp connections
+        private const string Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!£$%^&*()-=+_[]{}<>,.?";
+        public static async Task<string> GenerateToken(int length = 32)
+        {
+            return string.Create(length, Chars, (span, alphabet) =>
+            {
+                for (int i = 0; i < span.Length; i++)
+                {
+                    span[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+                }
+            });
+        }
+
+        /*
+         * For multiplayer linking TCP and UDP:
+         * - Generate a token on the server side once a tcp client connects and link it to that players object
+         * - Send the token to the TCP client
+         * - The TCP client also runs a UDP client
+         * - This UDP client connects to the servers UDP server
+         * - Every x ms send the token over UDP until:
+         * - The server recieves it and verifies that it is a real token belonging to one of the objects
+         * - The server confirms with the TCP client that it has recieved it so it can stop sending it
+         * - That UDP endpoint is linked with the player object, then messages from that UDP client can be used to update the player
+         */
     }
 
     #region TCP
