@@ -550,6 +550,8 @@
         private int _maxClients;
         public bool _started = false;
         public bool _doDebug = false;
+        public bool _autoDisconnect = true;
+        public int _timeout = 10;
 
         private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
         private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
@@ -560,11 +562,13 @@
         public Action<string> OnClientConnected { get; set; }
         public Action<string> OnClientDisconnected { get; set; }
 
-        public UdpNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
+        public UdpNetServer(int port = 8080, bool doDebug = true, bool autoDisconnect = true, int maxClients = 1, int timeOut = 10)
         {
             this._port = port;
             this._maxClients = maxClients;
             this._doDebug = doDebug;
+            this._autoDisconnect = autoDisconnect;
+            this._timeout = timeOut;
         }
 
         public async Task WaitForStart()
@@ -679,19 +683,22 @@
         {
             while (_started)
             {
-                await Task.Delay(5000); 
-                var now = DateTime.UtcNow;
-                var timeout = TimeSpan.FromSeconds(10); 
-
-                foreach (var client in _clients)
+                await Task.Delay(5000);
+                if (_autoDisconnect)
                 {
-                    if (now - client.Value.LastHeartbeat > timeout)
+                    var now = DateTime.UtcNow;
+                    var timeout = TimeSpan.FromSeconds(_timeout);
+
+                    foreach (var client in _clients)
                     {
-                        if (_clients.TryRemove(client.Key, out var removed))
+                        if (now - client.Value.LastHeartbeat > timeout)
                         {
-                            if (_doDebug) Console.WriteLine($"Client timed out: {client.Key}");
-                            OnClientDisconnected?.Invoke(client.Key);
-                            removed.MessageQueue.Writer.TryComplete();
+                            if (_clients.TryRemove(client.Key, out var removed))
+                            {
+                                if (_doDebug) Console.WriteLine($"Client timed out: {client.Key}");
+                                OnClientDisconnected?.Invoke(client.Key);
+                                removed.MessageQueue.Writer.TryComplete();
+                            }
                         }
                     }
                 }
