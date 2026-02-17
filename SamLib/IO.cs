@@ -413,6 +413,7 @@
                     break;
             }
 
+            // Wait for x time after finished type-write effect
             long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
             long time = 0;
             while (time < waitUntilReveal)
@@ -422,6 +423,7 @@
                 Thread.Sleep(typeSpeed);
             }
 
+            // Reveal
             foreach (int indexToReveal in glitchIndices)
             {
                 glitchMap[indexToReveal] = false;
