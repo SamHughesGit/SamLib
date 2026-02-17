@@ -2,6 +2,7 @@
 {
     using Microsoft.Xna.Framework;
     using System.Linq;
+    using System.Runtime.InteropServices.Swift;
 
     // Static IO functions
     public static class IO
@@ -41,13 +42,14 @@
         /// <param name="options">String array of options</param>
         /// <param name="prompt">Option prompt which is output before requesting an input</param>
         /// <returns>string option</returns>
-        public static string GetOption(string[] options, string prompt = null)
+        public static string GetOption(string[] options, bool isCaseSensitive = false, string prompt = null)
         {
             string input = "";
+            if(!isCaseSensitive) options = options.Select(s => s.ToLower().Trim()).ToArray();
             while (!options.Contains(input))
             {
                 if (!(prompt == null || prompt == "")) { Console.WriteLine(prompt); }
-                input = Console.ReadLine();
+                input = Console.ReadLine().ToLower().Trim();
             }
             return input;
         }
@@ -353,6 +355,99 @@
                 }
             }
             return index;
+        }
+
+        // --- Text Effects ---
+        public enum FadeType { LEFT_TO_RIGHT,  RIGHT_TO_LEFT, MIDDLE_OUT, EDGE_IN };
+
+        /// <summary>
+        /// Render obfuscated text and then fade it out
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="identifier"></param>
+        /// <param name="fadeType"></param>
+        public static void Obfuscate(string text, string identifier, FadeType fadeType, int typeSpeed = 60, int waitUntilReveal = 1000)
+        {
+            bool initialState = Console.CursorVisible;
+            Console.CursorVisible = false;
+            Random rng = new Random();
+            char[] glitchChars = "$%#@*&0123456789".ToCharArray();
+
+            bool[] glitchMap = new bool[text.Length];
+            bool isInside = false;
+            for (int i = 0; i <= text.Length - identifier.Length; i++)
+            {
+                if (text.Substring(i, identifier.Length) == identifier)
+                {
+                    isInside = !isInside;
+                    i += identifier.Length - 1;
+                    continue;
+                }
+                glitchMap[i] = isInside;
+            }
+
+            int cursorX = Console.CursorLeft;
+            int cursorY = Console.CursorTop;
+
+            for (int visibleCount = 0; visibleCount <= text.Length; visibleCount++)
+            {
+                RenderFrame(text, identifier, glitchMap, visibleCount, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
+            }
+
+            List<int> glitchIndices = new List<int>();
+            for (int i = 0; i < glitchMap.Length; i++) if (glitchMap[i]) glitchIndices.Add(i);
+
+            switch (fadeType)
+            {
+                case FadeType.RIGHT_TO_LEFT:
+                    glitchIndices.Reverse();
+                    break;
+                case FadeType.MIDDLE_OUT:
+                    int mid = text.Length / 2;
+                    glitchIndices = glitchIndices.OrderBy(x => Math.Abs(x - mid)).ToList();
+                    break;
+                case FadeType.EDGE_IN:
+                    int center = text.Length / 2;
+                    glitchIndices = glitchIndices.OrderByDescending(x => Math.Abs(x - center)).ToList();
+                    break;
+            }
+
+            long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            long time = 0;
+            while (time < waitUntilReveal)
+            {
+                time = DateTimeOffset.Now.ToUnixTimeMilliseconds() - now;
+                RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
+            }
+
+            foreach (int indexToReveal in glitchIndices)
+            {
+                glitchMap[indexToReveal] = false;
+                RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed); 
+            }
+
+            Console.WriteLine();
+            Console.CursorVisible = initialState;
+        }
+        private static void RenderFrame(string text, string identifier, bool[] glitchMap, int visibleCount, int x, int y, char[] glitchChars, Random rng)
+        {
+            Console.SetCursorPosition(x, y);
+            for (int i = 0; i < visibleCount; i++)
+            {
+                if (i <= text.Length - identifier.Length && text.Substring(i, identifier.Length) == identifier)
+                {
+                    i += identifier.Length - 1;
+                    continue;
+                }
+
+                if (glitchMap[i])
+                    Console.Write(glitchChars[rng.Next(glitchChars.Length)]);
+                else
+                    Console.Write(text[i]);
+            }
         }
     }
 }
