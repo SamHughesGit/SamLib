@@ -5,7 +5,6 @@
     using System.Collections.Concurrent;
     using System.Net;
     using System.Net.Sockets;
-    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Channels;
     #endregion
@@ -87,9 +86,10 @@
         {
             return string.Create(length, Chars, (span, alphabet) =>
             {
+                Random rng = new Random();
                 for (int i = 0; i < span.Length; i++)
                 {
-                    span[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+                    span[i] = alphabet[rng.Next(0, alphabet.Length)];
                 }
             });
         }
@@ -123,7 +123,7 @@
         public bool _doDebug = false;
 
         private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
-        private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
+        private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new ConcurrentDictionary<string, ConnectedClient>();
         private readonly Channel<(string clientId, byte[] data)> _msgChannel = Channel.CreateUnbounded<(string, byte[])>();
         private readonly Channel<string> _connectionChannel = Channel.CreateUnbounded<string>();
 

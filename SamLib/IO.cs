@@ -1,5 +1,6 @@
 ﻿namespace SamLib.IO
 {
+    using Microsoft.Xna.Framework;
     using System.Linq;
 
     // Static IO functions
@@ -14,7 +15,7 @@
         /// <param name="delay">delay in ms between character outputs</param>
         /// <param name="newLine">new line after output</param>
         /// <param name="punctuationMultiplier">multiplier for punctuation delay, (delay * puncMutliplier)</param>
-        public static void Out(string message, int delay = 90, bool newLine = true, bool showCursor = false, float punctuationMultiplier = 1.4f)
+        public static void Type(string message, int delay = 90, bool newLine = true, bool showCursor = false, float punctuationMultiplier = 1.4f)
         {
             bool cursorVisibility = Console.CursorVisible;
             Console.CursorVisible = showCursor;
@@ -35,6 +36,40 @@
         }
 
         /// <summary>
+        /// Get an input from an array of valid options
+        /// </summary>
+        /// <param name="options">String array of options</param>
+        /// <param name="prompt">Option prompt which is output before requesting an input</param>
+        /// <returns>string option</returns>
+        public static string GetOption(string[] options, string prompt = null)
+        {
+            string input = "";
+            while (!options.Contains(input))
+            {
+                if (!(prompt == null || prompt == "")) { Console.WriteLine(prompt); }
+                input = Console.ReadLine();
+            }
+            return input;
+        }
+
+        /// <summary>
+        /// Get an input from an array of valid options
+        /// </summary>
+        /// <param name="options">String array of options</param>
+        /// <param name="prompt">Option prompt which is output before requesting an input</param>
+        /// <returns>index of option</returns>
+        public static int GetOptionIndex(string[] options, string prompt = null)
+        {
+            string input = "";
+            while (!options.Contains(input))
+            {
+                if (!(prompt == null || prompt == "")) { Console.WriteLine(prompt); }
+                input = Console.ReadLine();
+            }
+            return options.IndexOf(input);
+        }
+
+        /// <summary>
         /// Display a list of selectable options and return the selected string
         /// </summary>
         /// <param name="prompt">message prompt</param>
@@ -42,7 +77,7 @@
         /// <param name="delay">animated display</param>
         /// <param name="selectedIdentifier">selected option identifier</param>
         /// <returns>Selected string</returns>
-        public static string GetOption(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
+        public static string GetOptionDropdown(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
         {
             int index = 0;
             bool selected = false;
@@ -51,7 +86,7 @@
             ConsoleColor baseColor = Console.ForegroundColor;
 
             Console.SetCursorPosition(0, cursorY);
-            if (delay <= 0) { Console.Write($"{prompt}\n"); } else { Out(prompt, delay); }
+            if (delay <= 0) { Console.Write($"{prompt}\n"); } else { Type(prompt, delay); }
 
             for (int i = 0; i < options.Length; i++)
             {
@@ -73,12 +108,12 @@
                     if (i == index)
                     {
                         if (colored) Console.ForegroundColor = color;
-                        Out($"{selectedIdentifier} {options[i]}", delay);
+                        Type($"{selectedIdentifier} {options[i]}", delay);
                     }
                     else
                     {
                         if (colored) Console.ForegroundColor = baseColor;
-                        Out($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
+                        Type($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
                     }
                 }
             }
@@ -128,7 +163,7 @@
         /// <param name="delay">animated display</param>
         /// <param name="selectedIdentifier">selected option identifier</param>
         /// <returns>Selected index</returns>
-        public static int GetOptionIndex(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
+        public static int GetOptionIndexDropdown(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
         {
             int index = 0;
             bool selected = false;
@@ -137,7 +172,7 @@
             ConsoleColor baseColor = Console.ForegroundColor;
 
             Console.SetCursorPosition(0, cursorY);
-            if (delay <= 0) { Console.Write($"{prompt}\n"); } else { Out(prompt, delay); }
+            if (delay <= 0) { Console.Write($"{prompt}\n"); } else { Type(prompt, delay); }
 
             for (int i = 0; i < options.Length; i++)
             {
@@ -159,12 +194,12 @@
                     if (i == index)
                     {
                         if (colored) Console.ForegroundColor = color;
-                        Out($"{selectedIdentifier} {options[i]}", delay);
+                        Type($"{selectedIdentifier} {options[i]}", delay);
                     }
                     else
                     {
                         if (colored) Console.ForegroundColor = baseColor;
-                        Out($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
+                        Type($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
                     }
                 }
             }
@@ -215,6 +250,8 @@
             int index = 0;
             int cursorY = Console.CursorTop;
             bool finished = false;
+
+            if (messages == null) return;
 
             while (!finished)
             {

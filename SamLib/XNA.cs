@@ -1,4 +1,4 @@
-﻿namespace SamLib.XNA
+﻿/*namespace SamLib.XNA
 {
     using Microsoft.Xna.Framework;
     using Microsoft.Xna.Framework.Graphics;
@@ -24,8 +24,8 @@
         }
     }
 
-    /* Example usage:
-     * _spriteBatch.Begin(transformMatrix: _camera.GetTransformationMatrix(GraphicsDevice)); */
+    Example usage:
+    _spriteBatch.Begin(transformMatrix: _camera.GetTransformationMatrix(GraphicsDevice));
 
     /// <summary>
     /// Handles input
@@ -278,3 +278,4 @@
         }
     }
 }
+*/
