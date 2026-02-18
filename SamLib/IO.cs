@@ -386,7 +386,7 @@
         /// <param name="text">Text to be displayed</param>
         /// <param name="identifier">Identifier to indicate an obfuscated section of text</param>
         /// <param name="fadeType">Type of fade for reveal</param>
-        public static void Obfuscate(string text, string identifier, FadeType fadeType, int typeSpeed = 60, int waitUntilReveal = 1000)
+        public static void ObfuscateReveal (string text, string identifier, FadeType fadeType, int typeSpeed = 60, int waitUntilReveal = 1000)
         {
             bool initialState = Console.CursorVisible;
             Console.CursorVisible = false;
@@ -449,6 +449,47 @@
                 glitchMap[indexToReveal] = false;
                 RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
                 Thread.Sleep(typeSpeed); 
+            }
+
+            Console.WriteLine();
+            Console.CursorVisible = initialState;
+        }
+
+        // Obfuscate no reveal
+        public static void Obfuscate(string text, string identifier, int typeSpeed = 60, int waitUntilReveal = 1000)
+        {
+            bool initialState = Console.CursorVisible;
+            Console.CursorVisible = false;
+            Random rng = new Random();
+            char[] glitchChars = "$%#@*&0123456789".ToCharArray();
+
+            bool[] glitchMap = new bool[text.Length];
+            bool isInside = false;
+            for (int i = 0; i <= text.Length - identifier.Length; i++)
+            {
+                if (text.Substring(i, identifier.Length) == identifier)
+                {
+                    isInside = !isInside;
+                    i += identifier.Length - 1;
+                    continue;
+                }
+                glitchMap[i] = isInside;
+            }
+
+            int cursorX = Console.CursorLeft;
+            int cursorY = Console.CursorTop;
+
+            for (int visibleCount = 0; visibleCount <= text.Length; visibleCount++)
+            {
+                RenderFrame(text, identifier, glitchMap, visibleCount, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
+            }
+
+            long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            while (DateTimeOffset.Now.ToUnixTimeMilliseconds() - now < waitUntilReveal)
+            {
+                RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
             }
 
             Console.WriteLine();
