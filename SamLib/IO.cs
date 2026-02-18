@@ -7,7 +7,7 @@
     // Static IO functions
     public static class IO
     {
-        public static readonly List<char> punctuation = new List<char> { '?', '!', '.', ',', ':', ';'};
+        public static readonly string punctuation = "!?,.-:;";
 
         /// <summary>
         /// Animated type-writer display
@@ -18,21 +18,29 @@
         /// <param name="punctuationMultiplier">multiplier for punctuation delay, (delay * puncMutliplier)</param>
         public static void Type(string message, int delay = 90, bool newLine = true, bool showCursor = false, float punctuationMultiplier = 1.4f)
         {
+            // Store cursor visibilty before changing it so it can be reverted at the end
             bool cursorVisibility = Console.CursorVisible;
             Console.CursorVisible = showCursor;
 
+            // If delay is <= 0, just write the message instantly
             if (delay <= 0) { Console.Write(message); }
             else
             {
+                // For each character, write it out
                 foreach (char c in message)
                 {
                     Console.Write(c);
 
+                    // If current character is in the punctuation list (just a string but they function like a list of chars)
+                    // then sleep longer (base delay * punctuation multiplier), otherwise sleep for regular time
                     if (punctuation.Contains(c)) { Thread.Sleep((int)(delay * punctuationMultiplier)); }
                     else { Thread.Sleep(delay); }
                 }
             }
+            // Optional new line
             if (newLine) Console.WriteLine();
+
+            // Restore cursor visibility settings
             Console.CursorVisible = cursorVisibility;
         }
 
@@ -44,13 +52,23 @@
         /// <returns>string option</returns>
         public static string GetOption(string[] options, bool isCaseSensitive = false, string prompt = null)
         {
+            // Start input off as invalid option
             string input = "";
+
+            // If isCaseSensitive is false, standardise the array by converting each element to lowercase and trim leading or proceeding white spaces 
             if(!isCaseSensitive) options = options.Select(s => s.ToLower().Trim()).ToArray();
+
+            // While input is not in the list (starts off as true, so loop starts)
             while (!options.Contains(input))
             {
+                // If user passed an optional prompt, display it before input each time
                 if (!(prompt == null || prompt == "")) { Console.WriteLine(prompt); }
+
+                // Get new (standardised) input
                 input = Console.ReadLine().ToLower().Trim();
             }
+
+            // Loop ends when inptu is valid, return input
             return input;
         }
 
@@ -60,6 +78,7 @@
         /// <param name="options">String array of options</param>
         /// <param name="prompt">Option prompt which is output before requesting an input</param>
         /// <returns>index of option</returns>
+        // Repeat of last function but returns the position in the array of the option selected
         public static int GetOptionIndex(string[] options, string prompt = null)
         {
             string input = "";
