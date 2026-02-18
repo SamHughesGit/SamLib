@@ -383,9 +383,9 @@
         /// <summary>
         /// Render obfuscated text and then fade it out
         /// </summary>
-        /// <param name="text"></param>
-        /// <param name="identifier"></param>
-        /// <param name="fadeType"></param>
+        /// <param name="text">Text to be displayed</param>
+        /// <param name="identifier">Identifier to indicate an obfuscated section of text</param>
+        /// <param name="fadeType">Type of fade for reveal</param>
         public static void Obfuscate(string text, string identifier, FadeType fadeType, int typeSpeed = 60, int waitUntilReveal = 1000)
         {
             bool initialState = Console.CursorVisible;
