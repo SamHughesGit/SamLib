@@ -519,7 +519,7 @@
         /// <param name="colors">Colors</param>
         /// <param name="newLine">Do new line?</param>
         /// <param name="delay">Per char delay</param>
-        public static void RichType(string text, string identifier, ConsoleColor[] colors, bool newLine = true, int delay = 90)
+        public static void RichType(string text, string identifier, ConsoleColor[] colors, int delay = 90, bool newLine = true, bool cursor = false)
         {
             if (string.IsNullOrEmpty(text)) return;
             if (colors == null || colors.Length == 0)
@@ -527,6 +527,9 @@
                 Console.Write(text);
                 return;
             }
+
+            bool cursorVisibility = Console.CursorVisible;
+            Console.CursorVisible = cursor;
 
             string[] parts = text.Split(new[] { identifier }, StringSplitOptions.None);
             ConsoleColor defaultColor = Console.ForegroundColor;
@@ -549,6 +552,7 @@
                     Type(parts[i], delay, false);
                 }
             }
+            Console.CursorVisible = cursorVisibility;
             if (newLine) Console.WriteLine();
         }
     }
