@@ -244,10 +244,10 @@
         }
 
         /// <summary>
-        /// Display scrollable messages (D and A)
+        /// Display scrollable messages (D and A or Left and Right)
         /// </summary>
         /// <param name="messages">Messages array</param>
-        public static void HorizontalScrollDisplay(string[] messages)
+        public static void HorizontalScrollDisplay(string[] messages, bool newLine = true)
         {
             int index = 0;
             int cursorY = Console.CursorTop;
@@ -278,7 +278,7 @@
                 {
                     finished = true;
                 }
-            }
+            } if (newLine) Console.WriteLine();
         }
 
         /// <summary>
