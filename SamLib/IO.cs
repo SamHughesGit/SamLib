@@ -286,7 +286,7 @@
         /// </summary>
         /// <param name="messages">Messages array</param>
         /// <returns>Selected string</returns>
-        public static string HorizontalScrollSelect(string[] messages)
+        public static string HorizontalScrollSelect(string[] messages, bool newLine = true)
         {
             int index = 0;
             int cursorY = Console.CursorTop;
@@ -315,7 +315,7 @@
                 {
                     finished = true;
                 }
-            }
+            } if (newLine) Console.WriteLine();
             return messages[index];
         }
 
@@ -324,7 +324,7 @@
         /// </summary>
         /// <param name="messages">Messages array</param>
         /// <returns>Selected index</returns>
-        public static int HorizontalScrollSelectIndex(string[] messages)
+        public static int HorizontalScrollSelectIndex(string[] messages, bool newLine = true)
         {
             int index = 0;
             int cursorY = Console.CursorTop;
@@ -354,6 +354,7 @@
                     finished = true;
                 }
             }
+            if (newLine) Console.WriteLine();
             return index;
         }
 
