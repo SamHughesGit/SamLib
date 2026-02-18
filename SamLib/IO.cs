@@ -471,5 +471,85 @@
                     Console.Write(text[i]);
             }
         }
+
+        /// <summary>
+        /// Write colored text using string parsing
+        /// </summary>
+        /// <param name="text">Text</param>
+        /// <param name="identifier">Identifier</param>
+        /// <param name="colors">Colors</param>
+        /// <param name="newLine">Do new line?</param>
+        public static void RichText(string text, string identifier, ConsoleColor[] colors, bool newLine = true)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (colors == null || colors.Length == 0)
+            {
+                Console.Write(text);
+                return;
+            }
+
+            string[] parts = text.Split(new[] { identifier }, StringSplitOptions.None);
+            ConsoleColor defaultColor = Console.ForegroundColor;
+            int colorIndex = 0;
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (i % 2 != 0)
+                {
+                    int activeColorIndex = Math.Min(colorIndex, colors.Length - 1);
+                    Console.ForegroundColor = colors[activeColorIndex];
+
+                    Console.Write(parts[i]);
+
+                    Console.ForegroundColor = defaultColor;
+                    colorIndex++; 
+                }
+                else
+                {
+                    Console.Write(parts[i]);
+                }
+            } if(newLine) Console.WriteLine();
+        }
+
+        /// <summary>
+        /// TypeWrite colored text using string parsing
+        /// </summary>
+        /// <param name="text">Text</param>
+        /// <param name="identifier">Identifier</param>
+        /// <param name="colors">Colors</param>
+        /// <param name="newLine">Do new line?</param>
+        /// <param name="delay">Per char delay</param>
+        public static void RichType(string text, string identifier, ConsoleColor[] colors, bool newLine = true, int delay = 90)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (colors == null || colors.Length == 0)
+            {
+                Console.Write(text);
+                return;
+            }
+
+            string[] parts = text.Split(new[] { identifier }, StringSplitOptions.None);
+            ConsoleColor defaultColor = Console.ForegroundColor;
+            int colorIndex = 0;
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (i % 2 != 0)
+                {
+                    int activeColorIndex = Math.Min(colorIndex, colors.Length - 1);
+                    Console.ForegroundColor = colors[activeColorIndex];
+
+                    Type(parts[i], delay, false);
+
+                    Console.ForegroundColor = defaultColor;
+                    colorIndex++;
+                }
+                else
+                {
+                    Type(parts[i], delay, false);
+                }
+            }
+            if (newLine) Console.WriteLine();
+        }
     }
 }
