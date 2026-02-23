@@ -111,32 +111,12 @@
 
             for (int i = 0; i < options.Length; i++)
             {
-                if (delay <= 0)
-                {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Console.Write($"{selectedIdentifier} {options[i]}\n", delay);
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n", delay);
-                    }
-                }
-                else
-                {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Type($"{selectedIdentifier} {options[i]}", delay);
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Type($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
-                    }
-                }
+                bool activeElement = i == index;
+                string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
+                string text = $"{head} {options[i]}\n";
+                if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
+                if (delay <= 0) Console.Write(text);
+                else Type(text, 90, false);
             }
 
             while (!selected)
@@ -147,16 +127,11 @@
 
                 for (int i = 0; i < options.Length; i++)
                 {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Console.Write($"{selectedIdentifier} {options[i]}\n");
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n");
-                    }
+                    bool activeElement = i == index;
+                    string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
+                    string text = $"{head} {options[i]}\n";
+                    if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
+                    Console.Write(text);
                 }
 
                 ConsoleKeyInfo key = Console.ReadKey(true);
@@ -170,7 +145,8 @@
                 {
                     index++;
                     if (index > options.Length - 1) { index = 0; }
-                }else if(key.Key == ConsoleKey.Enter) { selected = true; }
+                }
+                else if(key.Key == ConsoleKey.Enter) { selected = true; }
             }
 
             return options[index];
@@ -197,51 +173,27 @@
 
             for (int i = 0; i < options.Length; i++)
             {
-                if(delay <= 0)
-                {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Console.Write($"{selectedIdentifier} {options[i]}\n", delay);
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n", delay);
-                    }
-                }
-                else
-                {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Type($"{selectedIdentifier} {options[i]}", delay);
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Type($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}", delay);
-                    }
-                }
+                bool activeElement = i == index;
+                string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
+                string text = $"{head} {options[i]}\n";
+                if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
+                if (delay <= 0) Console.Write(text);
+                else Type(text, 90, false);
             }
 
             while (!selected)
             {
+                if (colored) Console.ForegroundColor = baseColor;
                 Console.SetCursorPosition(0, cursorY);
                 Console.Write($"{prompt}\n");
 
                 for (int i = 0; i < options.Length; i++)
                 {
-                    if (i == index)
-                    {
-                        if (colored) Console.ForegroundColor = color;
-                        Console.Write($"{selectedIdentifier} {options[i]}\n");
-                    }
-                    else
-                    {
-                        if (colored) Console.ForegroundColor = baseColor;
-                        Console.Write($"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} {options[i]}\n");
-                    }
+                    bool activeElement = i == index;
+                    string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
+                    string text = $"{head} {options[i]}\n";
+                    if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
+                    Console.Write(text);
                 }
 
                 ConsoleKeyInfo key = Console.ReadKey(true);
@@ -260,6 +212,276 @@
             }
 
             return index;
+        }
+
+        public static string[] DropDownMultiSelectMin(string prompt, string[] options, ConsoleColor color, int minSelected = 1,  int delay = 90, string selectedIdentifier = ">")
+        {
+            int index = 0;
+            bool[] selectedStatus = new bool[options.Length];
+            bool confirmed = false;
+            int cursorY = Console.CursorTop;
+            Console.CursorVisible = false;
+            ConsoleColor baseColor = Console.ForegroundColor;
+
+            if (delay <= 0) { Console.WriteLine(prompt); } else { Type(prompt, delay); }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                string checkbox = "[ ] "; 
+
+                if (i == index) Console.ForegroundColor = color;
+
+                if (delay <= 0)
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                else
+                    Type($"{prefix} {checkbox}{options[i]}", delay);
+
+                Console.ForegroundColor = baseColor;
+            }
+
+            while (!confirmed)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                Console.WriteLine(prompt); 
+
+                for (int i = 0; i < options.Length; i++)
+                {
+                    string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                    string checkbox = selectedStatus[i] ? "[x] " : "[ ] ";
+
+                    if (i == index) Console.ForegroundColor = color;
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                    Console.ForegroundColor = baseColor;
+                }
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.W:
+                        index = (index == 0) ? options.Length - 1 : index - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.S:
+                        index = (index == options.Length - 1) ? 0 : index + 1;
+                        break;
+                    case ConsoleKey.Spacebar:
+                        selectedStatus[index] = !selectedStatus[index];
+                        break;
+                    case ConsoleKey.Enter:
+                        if (selectedStatus.Count(s => s) < minSelected) break;
+                        confirmed = true;
+                        break;
+                }
+            }
+
+            List<string> result = new List<string>();
+            for (int i = 0; i < options.Length; i++)
+            {
+                if (selectedStatus[i]) result.Add(options[i]);
+            }
+            return result.ToArray();
+        }
+        public static string[] DropDownMultiSelectMin(string prompt, string[] options, int minSelected = 1, int delay = 90, string selectedIdentifier = ">")
+        {
+            int index = 0;
+            bool[] selectedStatus = new bool[options.Length];
+            bool confirmed = false;
+            int cursorY = Console.CursorTop;
+            Console.CursorVisible = false;
+
+            if (delay <= 0) { Console.WriteLine(prompt); } else { Type(prompt, delay); }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                string checkbox = "[ ] ";
+
+                if (delay <= 0)
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                else
+                    Type($"{prefix} {checkbox}{options[i]}", delay);
+            }
+
+            while (!confirmed)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                Console.WriteLine(prompt);
+
+                for (int i = 0; i < options.Length; i++)
+                {
+                    string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                    string checkbox = selectedStatus[i] ? "[x] " : "[ ] ";
+
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                }
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.W:
+                        index = (index == 0) ? options.Length - 1 : index - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.S:
+                        index = (index == options.Length - 1) ? 0 : index + 1;
+                        break;
+                    case ConsoleKey.Spacebar:
+                        selectedStatus[index] = !selectedStatus[index];
+                        break;
+                    case ConsoleKey.Enter:
+                        if (selectedStatus.Count(s => s) < minSelected) break;
+                        confirmed = true;
+                        break;
+                }
+            }
+
+            List<string> result = new List<string>();
+            for (int i = 0; i < options.Length; i++)
+            {
+                if (selectedStatus[i]) result.Add(options[i]);
+            }
+            return result.ToArray();
+        }
+        public static string[] DropDownMultiSelectMax(string prompt, string[] options, ConsoleColor color, int minSelected = 1, int maxSelected = 2, int delay = 90, string selectedIdentifier = ">")
+        {
+            int index = 0;
+            bool[] selectedStatus = new bool[options.Length];
+            bool confirmed = false;
+            int cursorY = Console.CursorTop;
+            Console.CursorVisible = false;
+            ConsoleColor baseColor = Console.ForegroundColor;
+
+            if (delay <= 0) { Console.WriteLine(prompt); } else { Type(prompt, delay); }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                string checkbox = "[ ] ";
+
+                if (i == index) Console.ForegroundColor = color;
+                if (delay <= 0) Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                else Type($"{prefix} {checkbox}{options[i]}", delay);
+                Console.ForegroundColor = baseColor;
+            }
+
+            while (!confirmed)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                int currentCount = selectedStatus.Count(x => x);
+                Console.WriteLine($"{prompt} ({currentCount}/{maxSelected} selected)");
+
+                for (int i = 0; i < options.Length; i++)
+                {
+                    string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                    string checkbox = selectedStatus[i] ? "[x] " : "[ ] ";
+
+                    if (i == index) Console.ForegroundColor = color;
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                    Console.ForegroundColor = baseColor;
+                }
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.W:
+                        index = (index == 0) ? options.Length - 1 : index - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.S:
+                        index = (index == options.Length - 1) ? 0 : index + 1;
+                        break;
+                    case ConsoleKey.Spacebar:
+                        if (selectedStatus[index])
+                        {
+                            selectedStatus[index] = false;
+                        }
+                        else if (currentCount < maxSelected)
+                        {
+                            selectedStatus[index] = true;
+                        }
+                        break;
+                    case ConsoleKey.Enter:
+                        if (selectedStatus.Count(s => s) < minSelected) break;
+                        confirmed = true;
+                        break;
+                }
+            }
+
+            return options.Where((item, idx) => selectedStatus[idx]).ToArray();
+        }
+        public static string[] DropDownMultiSelectMax(string prompt, string[] options, int minSelected = 1, int maxSelected = 2, int delay = 90, string selectedIdentifier = ">")
+        {
+            int index = 0;
+            bool[] selectedStatus = new bool[options.Length];
+            bool confirmed = false;
+            int cursorY = Console.CursorTop;
+            Console.CursorVisible = false;
+            ConsoleColor baseColor = Console.ForegroundColor;
+
+            if (delay <= 0) { Console.WriteLine(prompt); } else { Type(prompt, delay); }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                string checkbox = "[ ] ";
+
+                if (delay <= 0) Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                else Type($"{prefix} {checkbox}{options[i]}", delay);
+                Console.ForegroundColor = baseColor;
+            }
+
+            while (!confirmed)
+            {
+                Console.SetCursorPosition(0, cursorY);
+                int currentCount = selectedStatus.Count(x => x);
+                Console.WriteLine($"{prompt} ({currentCount}/{maxSelected} selected)");
+
+                for (int i = 0; i < options.Length; i++)
+                {
+                    string prefix = (i == index) ? selectedIdentifier : new string(' ', selectedIdentifier.Length);
+                    string checkbox = selectedStatus[i] ? "[x] " : "[ ] ";
+
+                    Console.WriteLine($"{prefix} {checkbox}{options[i]}");
+                    Console.ForegroundColor = baseColor;
+                }
+
+                ConsoleKeyInfo key = Console.ReadKey(true);
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.W:
+                        index = (index == 0) ? options.Length - 1 : index - 1;
+                        break;
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.S:
+                        index = (index == options.Length - 1) ? 0 : index + 1;
+                        break;
+                    case ConsoleKey.Spacebar:
+                        if (selectedStatus[index])
+                        {
+                            selectedStatus[index] = false;
+                        }
+                        else if (currentCount < maxSelected)
+                        {
+                            selectedStatus[index] = true;
+                        }
+                        break;
+                    case ConsoleKey.Enter:
+                        if (selectedStatus.Count(s => s) < minSelected) break;
+                        confirmed = true;
+                        break;
+                }
+            }
+
+            return options.Where((item, idx) => selectedStatus[idx]).ToArray();
         }
 
         /// <summary>
@@ -380,6 +602,8 @@
         // --- Text Effects ---
         public enum FadeType { LEFT_TO_RIGHT,  RIGHT_TO_LEFT, MIDDLE_OUT, EDGE_IN };
 
+        public static string glitchChars = "$&£%#@*&0123456789";
+
         /// <summary>
         /// Render obfuscated text and then fade it out
         /// </summary>
@@ -391,7 +615,6 @@
             bool initialState = Console.CursorVisible;
             Console.CursorVisible = false;
             Random rng = new Random();
-            char[] glitchChars = "$%#@*&0123456789".ToCharArray();
 
             bool[] glitchMap = new bool[text.Length];
             bool isInside = false;
@@ -456,13 +679,11 @@
         }
 
         // Obfuscate no reveal
-        public static void Obfuscate(string text, string identifier, int typeSpeed = 60, int waitUntilReveal = 1000)
+        public static void ObfuscateFade(string text, string identifier, int typeSpeed = 60, int waitUntilReveal = 1000)
         {
             bool initialState = Console.CursorVisible;
             Console.CursorVisible = false;
             Random rng = new Random();
-            char[] glitchChars = "$%#@*&0123456789".ToCharArray();
-
             bool[] glitchMap = new bool[text.Length];
             bool isInside = false;
             for (int i = 0; i <= text.Length - identifier.Length; i++)
@@ -486,8 +707,67 @@
             }
 
             long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-            while (DateTimeOffset.Now.ToUnixTimeMilliseconds() - now < waitUntilReveal)
+            long time = 0;
+            while (time < waitUntilReveal)
             {
+                time = DateTimeOffset.Now.ToUnixTimeMilliseconds() - now;
+                RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
+            }
+
+            List<int> obfuscatedIndices = new List<int>();
+            for (int i = 0; i < glitchMap.Length; i++)
+            {
+                if (glitchMap[i]) obfuscatedIndices.Add(i);
+            }
+
+            obfuscatedIndices = obfuscatedIndices.OrderBy(x => rng.Next()).ToList();
+
+            foreach (int index in obfuscatedIndices)
+            {
+                glitchMap[index] = false; 
+
+                RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
+
+                Thread.Sleep(typeSpeed);
+            }
+
+            Console.WriteLine();
+            Console.CursorVisible = initialState;
+        }
+
+        public static void Obfuscate(string text, string identifier, int typeSpeed = 60, int waitUntilReveal = 1000)
+        {
+            bool initialState = Console.CursorVisible;
+            Console.CursorVisible = false;
+            Random rng = new Random();
+            bool[] glitchMap = new bool[text.Length];
+            bool isInside = false;
+            for (int i = 0; i <= text.Length - identifier.Length; i++)
+            {
+                if (text.Substring(i, identifier.Length) == identifier)
+                {
+                    isInside = !isInside;
+                    i += identifier.Length - 1;
+                    continue;
+                }
+                glitchMap[i] = isInside;
+            }
+
+            int cursorX = Console.CursorLeft;
+            int cursorY = Console.CursorTop;
+
+            for (int visibleCount = 0; visibleCount <= text.Length; visibleCount++)
+            {
+                RenderFrame(text, identifier, glitchMap, visibleCount, cursorX, cursorY, glitchChars, rng);
+                Thread.Sleep(typeSpeed);
+            }
+
+            long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+            long time = 0;
+            while (time < waitUntilReveal)
+            {
+                time = DateTimeOffset.Now.ToUnixTimeMilliseconds() - now;
                 RenderFrame(text, identifier, glitchMap, text.Length, cursorX, cursorY, glitchChars, rng);
                 Thread.Sleep(typeSpeed);
             }
@@ -495,7 +775,8 @@
             Console.WriteLine();
             Console.CursorVisible = initialState;
         }
-        private static void RenderFrame(string text, string identifier, bool[] glitchMap, int visibleCount, int x, int y, char[] glitchChars, Random rng)
+
+        private static void RenderFrame(string text, string identifier, bool[] glitchMap, int visibleCount, int x, int y, string glitchChars, Random rng)
         {
             Console.SetCursorPosition(x, y);
             for (int i = 0; i < visibleCount; i++)
