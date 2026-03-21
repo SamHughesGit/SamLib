@@ -5,12 +5,104 @@
     using System.Collections.Concurrent;
     using System.Net;
     using System.Net.Sockets;
+    using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Channels;
     #endregion
 
     public static class Helper
     {
+
+        public static class Crypto
+        {
+            // Generate a new RSA Key Pair
+            public static (string publicK, string privateK) GenerateRSAKeys()
+            {
+                using var rsa = new RSACryptoServiceProvider(2048);
+                return (rsa.ToXmlString(false), rsa.ToXmlString(true));
+            }
+
+            // Encrypt with Public Key (Client side)
+            public static byte[] EncryptRSA(string publicKeyXml, byte[] data)
+            {
+                if (string.IsNullOrEmpty(publicKeyXml) || !publicKeyXml.StartsWith("<RSAKeyValue>"))
+                {
+                    throw new ArgumentException("Invalid RSA Public Key format. Expected XML string.");
+                }
+
+                using var rsa = new RSACryptoServiceProvider();
+                rsa.FromXmlString(publicKeyXml);
+                return rsa.Encrypt(data, fOAEP: true);
+            }
+
+            // Decrypt with Private Key (Server side)
+            public static byte[] DecryptRSA(string privateKey, byte[] data)
+            {
+                if (data == null || data.Length == 0)
+                    throw new ArgumentNullException(nameof(data), "RSA Decryption failed: Data buffer is null or empty.");
+
+                using var rsa = new RSACryptoServiceProvider();
+                rsa.FromXmlString(privateKey);
+                return rsa.Decrypt(data, fOAEP: true);
+            }
+
+            // AES-GCM settings
+            private const int NonceSize = 12; // Standard for GCM
+            private const int TagSize = 16;   // Authentication tag size
+
+            public static byte[] EncryptAES(byte[] data, byte[] key)
+            {
+                using var aes = new AesGcm(key);
+
+                // We need a unique 'nonce' for every message. 
+                byte[] nonce = new byte[NonceSize];
+                RandomNumberGenerator.Fill(nonce);
+
+                byte[] ciphertext = new byte[data.Length];
+                byte[] tag = new byte[TagSize];
+
+                aes.Encrypt(nonce, data, ciphertext, tag);
+
+                // Combine Nonce + Tag + Ciphertext into one array to send
+                byte[] result = new byte[NonceSize + TagSize + ciphertext.Length];
+                Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
+                Buffer.BlockCopy(tag, 0, result, NonceSize, TagSize);
+                Buffer.BlockCopy(ciphertext, 0, result, NonceSize + TagSize, ciphertext.Length);
+
+                return result;
+            }
+
+            public static byte[] DecryptAES(byte[] encryptedData, byte[] key)
+            {
+                if (encryptedData.Length < NonceSize + TagSize) return null;
+
+                using var aes = new AesGcm(key);
+
+                // Extract the pieces
+                byte[] nonce = new byte[NonceSize];
+                byte[] tag = new byte[TagSize];
+                byte[] ciphertext = new byte[encryptedData.Length - NonceSize - TagSize];
+
+                Buffer.BlockCopy(encryptedData, 0, nonce, 0, NonceSize);
+                Buffer.BlockCopy(encryptedData, NonceSize, tag, 0, TagSize);
+                Buffer.BlockCopy(encryptedData, NonceSize + TagSize, ciphertext, 0, ciphertext.Length);
+
+                byte[] decryptedData = new byte[ciphertext.Length];
+
+                try
+                {
+                    // This will throw an exception if the data was tampered with
+                    aes.Decrypt(nonce, ciphertext, tag, decryptedData);
+                    return decryptedData;
+                }
+                catch (CryptographicException)
+                {
+                    // Data was modified or key is wrong
+                    return null;
+                }
+            }
+        }
+
         public static async Task SendFramedPayload(NetworkStream stream, byte[] data)
         {
             byte[] lengthPrefix = BitConverter.GetBytes(data.Length);
@@ -21,23 +113,28 @@
 
         public static async Task<byte[]> ReadFramedPayload(NetworkStream stream)
         {
-            try
+            // Read the Int32 length prefix (4 bytes)
+            byte[] lengthBuffer = new byte[4];
+            int bytesRead = 0;
+            while (bytesRead < 4)
             {
-                byte[] lengthBuffer = new byte[4];
-                await stream.ReadExactlyAsync(lengthBuffer, 0, 4);
-
-                int dataLength = BitConverter.ToInt32(lengthBuffer, 0);
-
-                if (dataLength > 10 * 1024 * 1024) return null;
-
-                byte[] dataBuffer = new byte[dataLength];
-                await stream.ReadExactlyAsync(dataBuffer, 0, dataLength);
-                return dataBuffer;
+                int read = await stream.ReadAsync(lengthBuffer, bytesRead, 4 - bytesRead);
+                if (read == 0) return null; // Connection closed
+                bytesRead += read;
             }
-            catch
+            int payloadLength = BitConverter.ToInt32(lengthBuffer, 0);
+
+            // Read the actual payload based on that length
+            byte[] payload = new byte[payloadLength];
+            int totalReceived = 0;
+            while (totalReceived < payloadLength)
             {
-                return null;
+                int read = await stream.ReadAsync(payload, totalReceived, payloadLength - totalReceived);
+                if (read == 0) return null; // Connection closed mid-payload
+                totalReceived += read;
             }
+
+            return payload;
         }
 
         /// <summary>
@@ -114,6 +211,8 @@
         {
             public TcpClient Client { get; set; }
             public Channel<byte[]> MessageQueue { get; set; }
+            public byte[] AesSessionKey { get; set; }
+            public bool IsSecure { get; set; } = false;
         }
 
         public int _port;
@@ -127,6 +226,11 @@
         private readonly Channel<(string clientId, byte[] data)> _msgChannel = Channel.CreateUnbounded<(string, byte[])>();
         private readonly Channel<string> _connectionChannel = Channel.CreateUnbounded<string>();
 
+        // Encryption
+        private bool _doEncrypt = false;
+        private string _privKey;
+        private string _pubKey;
+
         // Assignable Action: (ClientId, Data)
         public Action<string, byte[]> OnMessageReceived { get; set; }
 
@@ -135,11 +239,18 @@
         public Action<string> OnClientDisconnected { get; set; }
 
         // Constructor
-        public TcpNetServer(int port = 8080, bool doDebug = true, int maxClients = 1)
+        public TcpNetServer(int port = 8080, bool doEncrypt = false, bool doDebug = true, int maxClients = 1)
         {
             this._port = port;
             this._maxClients = maxClients;
             this._doDebug = doDebug;
+            this._doEncrypt = doEncrypt;
+
+            // If encrypted, generate server keys
+            if (_doEncrypt)
+            {
+                (this._pubKey, this._privKey) = Helper.Crypto.GenerateRSAKeys();
+            }
         }
 
         /// <summary>
@@ -214,8 +325,6 @@
 
                 if (_clients.TryAdd(clientId, clientInfo))
                 {
-                    OnClientConnected?.Invoke(clientId);
-                    _connectionChannel.Writer.TryWrite(clientId);
                     if (_doDebug) Console.WriteLine($"Client connected: {clientId}. Total: {_clients.Count}");
                     _ = HandleClientAsync(clientId, clientInfo);
                 }
@@ -228,13 +337,61 @@
             {
                 using var stream = clientInfo.Client.GetStream();
 
+                if (_doEncrypt)
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+                    // Send Public Key
+                    byte[] pubKeyBytes = Encoding.UTF8.GetBytes("PUBKEY:" + _pubKey);
+                    await Helper.SendFramedPayload(stream, pubKeyBytes);
+
+                    // Read Response
+                    byte[] encryptedKeyResponse = await Helper.ReadFramedPayload(stream);
+                    if (encryptedKeyResponse == null) throw new Exception("Client disconnected during handshake.");
+
+                    string responseStr = Encoding.UTF8.GetString(encryptedKeyResponse);
+
+                    if (responseStr.StartsWith("AESKEY:"))
+                    {
+                        // Safety check the substring
+                        string base64Data = responseStr.Substring(7);
+                        if (string.IsNullOrWhiteSpace(base64Data)) throw new Exception("Received empty AES key.");
+
+                        byte[] encryptedAesKey = Convert.FromBase64String(base64Data);
+
+                        // Decrypt the key
+                        clientInfo.AesSessionKey = Helper.Crypto.DecryptRSA(_privKey, encryptedAesKey);
+                        clientInfo.IsSecure = true;
+
+                        if (_doDebug) Console.WriteLine($"[Security] Secure session established for {clientId}");
+                    }
+                    else
+                    {
+                        throw new Exception("Client sent invalid handshake response.");
+                    }
+                }
+
+                OnClientConnected?.Invoke(clientId);
+                _connectionChannel.Writer.TryWrite(clientId);
+
                 while (true)
                 {
                     byte[] receivedData = await Helper.ReadFramedPayload(stream);
                     if (receivedData == null) break; // Diconnected
 
-                    NotifyMessageReceived(clientId, receivedData);
+                    // Decrypt the data if encryption is enabled
+                    if (_doEncrypt && clientInfo.IsSecure)
+                    {
+                        receivedData = Helper.Crypto.DecryptAES(receivedData, clientInfo.AesSessionKey);
 
+                        if (receivedData == null)
+                        {
+                            if (_doDebug) Console.WriteLine($"[Security] Decryption failed for {clientId}. Dropping packet.");
+                            continue;
+                        }
+                    }
+
+                    NotifyMessageReceived(clientId, receivedData);
                     await clientInfo.MessageQueue.Writer.WriteAsync(receivedData);
                 }
             }
@@ -267,13 +424,9 @@
         public async Task Broadcast(string message)
         {
             byte[] data = Encoding.UTF8.GetBytes(message);
-            foreach (var clientInfo in _clients.Values)
+            foreach (var clientId in _clients.Keys)
             {
-                try
-                {
-                    await Helper.SendFramedPayload(clientInfo.Client.GetStream(), data);
-                }
-                catch { /* Failed delivery to specific client */ }
+                await SendToClient(clientId, data);
             }
         }
 
@@ -301,16 +454,24 @@
             {
                 try
                 {
-                    await Helper.SendFramedPayload(clientInfo.Client.GetStream(), data);
+                    byte[] dataToSend = data;
+
+                    // Apply AES encryption if the handshake is complete
+                    if (_doEncrypt && clientInfo.IsSecure && clientInfo.AesSessionKey != null)
+                    {
+                        dataToSend = Helper.Crypto.EncryptAES(data, clientInfo.AesSessionKey);
+                    }
+
+                    await Helper.SendFramedPayload(clientInfo.Client.GetStream(), dataToSend);
                     return true;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // If writing fails, the client likely disconnected
+                    if (_doDebug) Console.WriteLine($"[TCP] Send failed to {clientId}: {ex.Message}");
                     return false;
                 }
             }
-            return false; // Client ID not found
+            return false;
         }
 
         /// <summary>
@@ -393,17 +554,22 @@
         private bool _isConnected;
         private bool _doDebug = false;
 
+        // Encryption Fields
+        private bool _doEncrypt;
+        private byte[] _aesSessionKey;
+        private bool _isSecure = false;
+
         private readonly Channel<byte[]> _msgChannel = Channel.CreateUnbounded<byte[]>();
 
-        // Assignable Actions (Callbacks)
         public Action<byte[]> OnMessageReceived { get; set; }
         public Action OnConnected { get; set; }
         public Action OnDisconnected { get; set; }
 
-        public TcpNetClient(string hostname = "127.0.0.1", int port = 8080, bool doDebug = false)
+        public TcpNetClient(string hostname = "127.0.0.1", int port = 8080, bool doEncrypt = false, bool doDebug = false)
         {
             _hostname = hostname;
             _port = port;
+            _doEncrypt = doEncrypt;
             _doDebug = doDebug;
         }
 
@@ -421,13 +587,19 @@
                 try
                 {
                     _isConnected = false;
+                    _isSecure = false;
                     _client?.Dispose();
 
                     _client = new TcpClient();
                     await _client.ConnectAsync(_hostname, _port);
                     _stream = _client.GetStream();
-                    _isConnected = true;
 
+                    if (_doEncrypt)
+                    {
+                        if (!await PerformHandshake()) return false;
+                    }
+
+                    _isConnected = true;
                     OnConnected?.Invoke();
                     _ = ReceiveLoop();
                     return true;
@@ -440,6 +612,39 @@
                 }
             }
             return false;
+        }
+
+        private async Task<bool> PerformHandshake()
+        {
+            try
+            {
+                // Wait for Server's Public Key
+                byte[] keyData = await Helper.ReadFramedPayload(_stream);
+                string keyMsg = Encoding.UTF8.GetString(keyData);
+
+                if (!keyMsg.StartsWith("PUBKEY:")) throw new Exception("Invalid Handshake");
+                string pubKey = keyMsg.Substring(7);
+
+                // Generate a random 32-byte AES Key
+                _aesSessionKey = new byte[32];
+                using (var rng = RandomNumberGenerator.Create()) { rng.GetBytes(_aesSessionKey); }
+
+                // Encrypt AES Key with Server's Public RSA Key
+                byte[] encryptedAesKey = Helper.Crypto.EncryptRSA(pubKey, _aesSessionKey);
+                string response = "AESKEY:" + Convert.ToBase64String(encryptedAesKey);
+
+                // Send back to server
+                await Helper.SendFramedPayload(_stream, Encoding.UTF8.GetBytes(response));
+
+                _isSecure = true;
+                if (_doDebug) Console.WriteLine("[Security] Encrypted session established.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (_doDebug) Console.WriteLine($"[Security] Handshake failed: {ex.Message}");
+                return false;
+            }
         }
 
         private void NotifyMessageReceived(byte[] data)
@@ -475,20 +680,20 @@
                 while (_client != null && _client.Connected)
                 {
                     byte[] data = await Helper.ReadFramedPayload(_stream);
-
                     if (data == null) break;
+
+                    // DECRYPT
+                    if (_doEncrypt && _isSecure)
+                    {
+                        data = Helper.Crypto.DecryptAES(data, _aesSessionKey);
+                        if (data == null) continue; // Failed decryption
+                    }
 
                     NotifyMessageReceived(data);
                 }
             }
-            catch
-            {
-                // Likely a connection drop
-            }
-            finally
-            {
-                Disconnect();
-            }
+            catch { /* Connection dropped */ }
+            finally { Disconnect(); }
         }
 
         /// <summary>
@@ -513,7 +718,15 @@
             if (!_isConnected || _stream == null) return;
             try
             {
-                await Helper.SendFramedPayload(_stream, data);
+                byte[] dataToSend = data;
+
+                // ENCRYPT
+                if (_doEncrypt && _isSecure)
+                {
+                    dataToSend = Helper.Crypto.EncryptAES(data, _aesSessionKey);
+                }
+
+                await Helper.SendFramedPayload(_stream, dataToSend);
             }
             catch { Disconnect(); }
         }
