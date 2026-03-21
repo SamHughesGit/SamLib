@@ -974,7 +974,7 @@
         public NetLinkerClient(TcpNetClient tcp, UdpNetClient udp, bool debug)
         {
             _tcp = tcp;
-            _udp = udp;
+            _udp = udp; 
             _debug = debug;
         }
 
@@ -999,7 +999,7 @@
                 // Unsub
                 _tcp.OnMessageReceived -= HandleHandshakeMessages;
 
-                Console.WriteLine("[Client] Handshake Complete. Unsubscribed from TCP Auth listener.");
+                if(_debug)Console.WriteLine("[Client] Handshake Complete. Unsubscribed from TCP Auth listener.");
             }
         }
 
