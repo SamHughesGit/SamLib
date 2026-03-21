@@ -915,4 +915,108 @@
         }
     }
     #endregion
+
+    #region Linker
+    public class NetLinker
+    {
+        private readonly TcpNetServer _tcp;
+        private readonly UdpNetServer _udp;
+        private bool _debug;
+
+        // Maps Token -> TCP ClientID
+        private readonly ConcurrentDictionary<string, string> _pendingTokens = new();
+        // Maps TCP ClientID -> UDP EndPoint str
+        private readonly ConcurrentDictionary<string, string> _links = new();
+
+        public NetLinker(TcpNetServer tcp, UdpNetServer udp, bool debug = false)
+        {
+            _tcp = tcp;
+            _udp = udp;
+            _debug = debug;
+
+            // Listen for the UDP handshake packets
+            _udp.OnMessageReceived += async (udpId, data) =>
+            {
+                string msg = Encoding.UTF8.GetString(data);
+                if (msg.StartsWith("AUTH:"))
+                {
+                    string token = msg.Substring(5);
+                    if (_pendingTokens.TryRemove(token, out string tcpId))
+                    {
+                        _links[tcpId] = udpId;
+                        // Send OK via TCP
+                        await _tcp.SendToClient(tcpId, "AUTH_OK");
+                        if(_debug)Console.WriteLine($"[Linker] Linked TCP {tcpId} to UDP {udpId}");
+                    }
+                }
+            };
+        }
+
+        public async Task StartLink(string tcpId)
+        {
+            string token = await Helper.GenerateToken(16);
+            _pendingTokens[token] = tcpId;
+            // Send token to client via TCP
+            await _tcp.SendToClient(tcpId, $"TOKEN:{token}");
+        }
+
+        public string GetUdpId(string tcpId) => _links.TryGetValue(tcpId, out var id) ? id : null;
+        public void Remove(string tcpId) => _links.TryRemove(tcpId, out _);
+    }
+
+    public class NetLinkerClient
+    {
+        private readonly TcpNetClient _tcp;
+        private readonly UdpNetClient _udp;
+        private bool _debug;
+        private bool _isLinked = false;
+
+        public NetLinkerClient(TcpNetClient tcp, UdpNetClient udp, bool debug)
+        {
+            _tcp = tcp;
+            _udp = udp;
+            _debug = debug;
+        }
+
+        public void InitHandshake()
+        {
+            _tcp.OnMessageReceived += HandleHandshakeMessages;
+        }
+
+        private async void HandleHandshakeMessages(byte[] data)
+        {
+            string msg = Encoding.UTF8.GetString(data);
+
+            if (msg.StartsWith("TOKEN:"))
+            {
+                string token = msg.Substring(6);
+                _ = BeginUdpSpam(token);
+            }
+            else if (msg == "AUTH_OK")
+            {
+                _isLinked = true;
+
+                // Unsub
+                _tcp.OnMessageReceived -= HandleHandshakeMessages;
+
+                Console.WriteLine("[Client] Handshake Complete. Unsubscribed from TCP Auth listener.");
+            }
+        }
+
+        private async Task BeginUdpSpam(string token)
+        {
+            _isLinked = false;
+            int attempts = 0;
+
+            while (!_isLinked && attempts < 20)
+            {
+                await _udp.Send($"AUTH:{token}");
+                await Task.Delay(200); // 5 times per second
+                attempts++;
+            }
+
+            if (!_isLinked && _debug) Console.WriteLine("[Client] UDP Link Timeout.");
+        }
+    }
+    #endregion
 }
