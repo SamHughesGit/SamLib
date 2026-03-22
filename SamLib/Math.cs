@@ -1,7 +1,7 @@
-﻿using System;
-
-namespace SamLib.Math
+﻿namespace SamLib.Math
 {
+    using System;
+
     public struct Vec2
     {
         public float X;
@@ -23,7 +23,7 @@ namespace SamLib.Math
         /// <summary>
         /// Returns the total magnitude (hypotenuse) of the vector using Pythagoras.
         /// </summary>
-        public float Length => (float)System.Math.Sqrt(X * X + Y * Y);
+        public float Length => (float)Math.Sqrt(X * X + Y * Y);
 
         /// <summary>
         /// Resizes the vector so its length is exactly 1, but keeps the direction.
@@ -59,7 +59,7 @@ namespace SamLib.Math
         {
             float v1 = value1.X - value2.X;
             float v2 = value1.Y - value2.Y;
-            return (float)System.Math.Sqrt((v1 * v1) + (v2 * v2));
+            return (float)Math.Sqrt((v1 * v1) + (v2 * v2));
         }
 
         /// <summary>
@@ -120,8 +120,8 @@ namespace SamLib.Math
         /// <param name="max"></param>
         public void Clamp(Vec2 min, Vec2 max)
         {
-            X = System.Math.Max(min.X, System.Math.Min(max.X, X));
-            Y = System.Math.Max(min.Y, System.Math.Min(max.Y, Y));
+            X = Math.Max(min.X, Math.Min(max.X, X));
+            Y = Math.Max(min.Y, Math.Min(max.Y, Y));
         }
         
         /// <summary>
@@ -131,22 +131,22 @@ namespace SamLib.Math
         /// <returns></returns>
         public Vec2 Forward(float rotation)
         {
-            return new Vec2((float)System.Math.Cos(rotation), (float)System.Math.Sin(rotation));
+            return new Vec2((float)Math.Cos(rotation), (float)Math.Sin(rotation));
         }
             
         public Vec2 Back(float rotation)
         {
-            return Forward(rotation + (float)System.Math.PI);
+            return Forward(rotation + (float)Math.PI);
         }
 
         public Vec2 Right(float rotation)
         {
-            return Forward(rotation + (float)System.Math.PI / 2f);
+            return Forward(rotation + (float)Math.PI / 2f);
         }
 
         public Vec2 Left(float rotation)
         {
-            return Forward(rotation - (float)System.Math.PI / 2f);
+            return Forward(rotation - (float)Math.PI / 2f);
         }
         #endregion
 

@@ -1,7 +1,7 @@
-﻿using Microsoft.Data.Sqlite;
-
-namespace SamLib.DB
+﻿namespace SamLib.DB
 {
+    using Microsoft.Data.Sqlite;
+
     // DB Parent
     public abstract class SqlBase : IDisposable
     {

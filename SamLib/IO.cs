@@ -1,8 +1,7 @@
 ﻿namespace SamLib.IO
 {
-    using Microsoft.Xna.Framework;
+    using System;
     using System.Linq;
-    using System.Runtime.InteropServices.Swift;
 
     // Static IO functions
     public static class IO

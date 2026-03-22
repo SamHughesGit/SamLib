@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace SamLib.Util
+﻿namespace SamLib.Util
 {
     static class Util
     {
