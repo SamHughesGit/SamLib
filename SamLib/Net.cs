@@ -190,18 +190,6 @@
                 }
             });
         }
-
-        /*
-         * For multiplayer linking TCP and UDP:
-         * - Generate a token on the server side once a tcp client connects and link it to that players object
-         * - Send the token to the TCP client
-         * - The TCP client also runs a UDP client
-         * - This UDP client connects to the servers UDP server
-         * - Every x ms send the token over UDP until:
-         * - The server recieves it and verifies that it is a real token belonging to one of the objects
-         * - The server confirms with the TCP client that it has recieved it so it can stop sending it
-         * - That UDP endpoint is linked with the player object, then messages from that UDP client can be used to update the player
-         */
     }
 
     #region TCP
