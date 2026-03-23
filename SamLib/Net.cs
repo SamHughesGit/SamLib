@@ -8,101 +8,11 @@
     using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Channels;
+    using SamLib.Security;
     #endregion
 
     public static class Helper
     {
-
-        public static class Crypto
-        {
-            // Generate a new RSA Key Pair
-            public static (string publicK, string privateK) GenerateRSAKeys()
-            {
-                using var rsa = new RSACryptoServiceProvider(2048);
-                return (rsa.ToXmlString(false), rsa.ToXmlString(true));
-            }
-
-            // Encrypt with Public Key (Client side)
-            public static byte[] EncryptRSA(string publicKeyXml, byte[] data)
-            {
-                if (string.IsNullOrEmpty(publicKeyXml) || !publicKeyXml.StartsWith("<RSAKeyValue>"))
-                {
-                    throw new ArgumentException("Invalid RSA Public Key format. Expected XML string.");
-                }
-
-                using var rsa = new RSACryptoServiceProvider();
-                rsa.FromXmlString(publicKeyXml);
-                return rsa.Encrypt(data, fOAEP: true);
-            }
-
-            // Decrypt with Private Key (Server side)
-            public static byte[] DecryptRSA(string privateKey, byte[] data)
-            {
-                if (data == null || data.Length == 0)
-                    throw new ArgumentNullException(nameof(data), "RSA Decryption failed: Data buffer is null or empty.");
-
-                using var rsa = new RSACryptoServiceProvider();
-                rsa.FromXmlString(privateKey);
-                return rsa.Decrypt(data, fOAEP: true);
-            }
-
-            // AES-GCM settings
-            private const int NonceSize = 12; // Standard for GCM
-            private const int TagSize = 16;   // Authentication tag size
-
-            public static byte[] EncryptAES(byte[] data, byte[] key)
-            {
-                using var aes = new AesGcm(key);
-
-                // We need a unique 'nonce' for every message. 
-                byte[] nonce = new byte[NonceSize];
-                RandomNumberGenerator.Fill(nonce);
-
-                byte[] ciphertext = new byte[data.Length];
-                byte[] tag = new byte[TagSize];
-
-                aes.Encrypt(nonce, data, ciphertext, tag);
-
-                // Combine Nonce + Tag + Ciphertext into one array to send
-                byte[] result = new byte[NonceSize + TagSize + ciphertext.Length];
-                Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
-                Buffer.BlockCopy(tag, 0, result, NonceSize, TagSize);
-                Buffer.BlockCopy(ciphertext, 0, result, NonceSize + TagSize, ciphertext.Length);
-
-                return result;
-            }
-
-            public static byte[] DecryptAES(byte[] encryptedData, byte[] key)
-            {
-                if (encryptedData.Length < NonceSize + TagSize) return null;
-
-                using var aes = new AesGcm(key);
-
-                // Extract the pieces
-                byte[] nonce = new byte[NonceSize];
-                byte[] tag = new byte[TagSize];
-                byte[] ciphertext = new byte[encryptedData.Length - NonceSize - TagSize];
-
-                Buffer.BlockCopy(encryptedData, 0, nonce, 0, NonceSize);
-                Buffer.BlockCopy(encryptedData, NonceSize, tag, 0, TagSize);
-                Buffer.BlockCopy(encryptedData, NonceSize + TagSize, ciphertext, 0, ciphertext.Length);
-
-                byte[] decryptedData = new byte[ciphertext.Length];
-
-                try
-                {
-                    // This will throw an exception if the data was tampered with
-                    aes.Decrypt(nonce, ciphertext, tag, decryptedData);
-                    return decryptedData;
-                }
-                catch (CryptographicException)
-                {
-                    // Data was modified or key is wrong
-                    return null;
-                }
-            }
-        }
-
         public static async Task SendFramedPayload(NetworkStream stream, byte[] data)
         {
             byte[] lengthPrefix = BitConverter.GetBytes(data.Length);
@@ -141,8 +51,15 @@
         /// Get public IPv4
         /// </summary>
         /// <returns>Returns public IPv4</returns>
-        public static async Task<string> GetIPv4()
+        public static async Task<string?> GetIPv4(bool public_ip = true)
         {
+            if (!public_ip)
+            {
+                return Dns.GetHostEntry(Dns.GetHostName())
+                    .AddressList
+                    .FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork)?
+                    .ToString();
+            }
             using var client = new HttpClient();
             string publicIp = await client.GetStringAsync("https://api.ipify.org");
             return publicIp.Trim();
@@ -208,6 +125,7 @@
         private int _maxClients;
         public bool _started = false;
         public bool _doDebug = false;
+        private bool _doPortForward = false;
 
         private TaskCompletionSource<bool> _startTcs = new TaskCompletionSource<bool>();
         private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new ConcurrentDictionary<string, ConnectedClient>();
@@ -237,7 +155,7 @@
             // If encrypted, generate server keys
             if (_doEncrypt)
             {
-                (this._pubKey, this._privKey) = Helper.Crypto.GenerateRSAKeys();
+                (this._pubKey, this._privKey) = Crypto.GenerateRSAKeys();
             }
         }
 
@@ -255,7 +173,7 @@
         /// Get server ip + port
         /// </summary>
         /// <returns></returns>
-        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4()}:{_port}";
+        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4(_doPortForward)}:{_port}";
 
         /// <summary>
         /// Starts the server
@@ -265,6 +183,7 @@
         /// <returns></returns>
         public async Task StartServer(string description = "server", int maxAttempts = 5, int delay = 2000, bool doPortForward = true)
         {
+            _doPortForward = doPortForward;
             int attempt = 0;
             bool success = false;
             while ((!success && (attempt < maxAttempts)) && doPortForward)
@@ -348,7 +267,7 @@
                         byte[] encryptedAesKey = Convert.FromBase64String(base64Data);
 
                         // Decrypt the key
-                        clientInfo.AesSessionKey = Helper.Crypto.DecryptRSA(_privKey, encryptedAesKey);
+                        clientInfo.AesSessionKey = Crypto.DecryptRSA(_privKey, encryptedAesKey);
                         clientInfo.IsSecure = true;
 
                         if (_doDebug) Console.WriteLine($"[Security] Secure session established for {clientId}");
@@ -370,7 +289,7 @@
                     // Decrypt the data if encryption is enabled
                     if (_doEncrypt && clientInfo.IsSecure)
                     {
-                        receivedData = Helper.Crypto.DecryptAES(receivedData, clientInfo.AesSessionKey);
+                        receivedData = Crypto.DecryptAES(receivedData, clientInfo.AesSessionKey);
 
                         if (receivedData == null)
                         {
@@ -447,7 +366,7 @@
                     // Apply AES encryption if the handshake is complete
                     if (_doEncrypt && clientInfo.IsSecure && clientInfo.AesSessionKey != null)
                     {
-                        dataToSend = Helper.Crypto.EncryptAES(data, clientInfo.AesSessionKey);
+                        dataToSend = Crypto.EncryptAES(data, clientInfo.AesSessionKey);
                     }
 
                     await Helper.SendFramedPayload(clientInfo.Client.GetStream(), dataToSend);
@@ -618,7 +537,7 @@
                 using (var rng = RandomNumberGenerator.Create()) { rng.GetBytes(_aesSessionKey); }
 
                 // Encrypt AES Key with Server's Public RSA Key
-                byte[] encryptedAesKey = Helper.Crypto.EncryptRSA(pubKey, _aesSessionKey);
+                byte[] encryptedAesKey = Crypto.EncryptRSA(pubKey, _aesSessionKey);
                 string response = "AESKEY:" + Convert.ToBase64String(encryptedAesKey);
 
                 // Send back to server
@@ -673,7 +592,7 @@
                     // DECRYPT
                     if (_doEncrypt && _isSecure)
                     {
-                        data = Helper.Crypto.DecryptAES(data, _aesSessionKey);
+                        data = Crypto.DecryptAES(data, _aesSessionKey);
                         if (data == null) continue; // Failed decryption
                     }
 
@@ -711,7 +630,7 @@
                 // ENCRYPT
                 if (_doEncrypt && _isSecure)
                 {
-                    dataToSend = Helper.Crypto.EncryptAES(data, _aesSessionKey);
+                    dataToSend = Crypto.EncryptAES(data, _aesSessionKey);
                 }
 
                 await Helper.SendFramedPayload(_stream, dataToSend);
@@ -747,6 +666,7 @@
         }
 
         public int _port;
+        private bool _doPortForward = false;
         private UdpClient _udpListener;
         private int _maxClients;
         public bool _started = false;
@@ -778,10 +698,11 @@
             await _startTcs.Task;
         }
 
-        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4()}:{_port}";
+        public async Task<string> GetServerAddress() => $"{await Helper.GetIPv4(_doPortForward)}:{_port}";
 
         public async Task StartServer(string description = "udp_server", int maxAttempts = 5, int delay = 2000, bool doPortForward = true)
         {
+            _doPortForward = doPortForward;
             int attempt = 0;
             bool success = false;
 
