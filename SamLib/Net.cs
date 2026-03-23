@@ -93,20 +93,6 @@
                 return false;
             }
         }
-
-        // Generate unique token for linking Tcp and Udp connections
-        private const string Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!£$%^&*()-=+_[]{}<>,.?";
-        public static async Task<string> GenerateToken(int length = 32)
-        {
-            return string.Create(length, Chars, (span, alphabet) =>
-            {
-                Random rng = new Random();
-                for (int i = 0; i < span.Length; i++)
-                {
-                    span[i] = alphabet[rng.Next(0, alphabet.Length)];
-                }
-            });
-        }
     }
 
     #region TCP
@@ -1076,7 +1062,7 @@
 
         public async Task StartLink(string tcpId)
         {
-            string token = await Helper.GenerateToken(16);
+            string token = await Util.GenerateToken(16);
             _pendingTokens[token] = tcpId;
             // Send token to client via TCP
             await _tcp.SendToClient(tcpId, $"TOKEN:{token}");

@@ -13,11 +13,13 @@
             Y = y;
         }
 
-        // Statics 
+        #region Premades
         public static Vec2 Zero => new Vec2(0f, 0f);
         public static Vec2 One => new Vec2(1f, 1f);
         public static Vec2 UnitX => new Vec2(1f, 0f);
         public static Vec2 UnitY => new Vec2(0f, 1f);
+        #endregion
+
         #region Methods
 
         /// <summary>

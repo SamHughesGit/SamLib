@@ -1,4 +1,6 @@
-﻿namespace SamLib.Security
+﻿using System.Security.Cryptography;
+
+namespace SamLib.Security
 {
     public static class Crypto
     {
@@ -90,4 +92,21 @@
         }
     }
 
+    public static class Util
+    {
+        // Generate unique token for linking Tcp and Udp connections
+        private const string Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!£$%^&*()-=+_[]{}<>,.?";
+
+        public static async Task<string> GenerateToken(int length = 32)
+        {
+            return string.Create(length, Chars, (span, alphabet) =>
+            {
+                Random rng = new Random();
+                for (int i = 0; i < span.Length; i++)
+                {
+                    span[i] = alphabet[rng.Next(0, alphabet.Length)];
+                }
+            });
+        }
+    }
 }
