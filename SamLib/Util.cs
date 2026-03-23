@@ -1,9 +1,12 @@
 ﻿namespace SamLib.Util
 {
     using System.Diagnostics;
+    using System.Text;
 
     static class Util
     {
+
+        #region General
         public static void Log(string text)
         {
             Console.WriteLine(text);
@@ -31,5 +34,28 @@
                 }
             }
         }
+        #endregion
+
+        #region Conversions
+        public enum CharacterSet
+        {
+            UTF8,
+            ASCII,
+            UNICODE
+        }
+
+        public static string ToString(this byte[] data, CharacterSet cset = CharacterSet.UTF8)
+        {
+            switch(cset){
+                case CharacterSet.UTF8:
+                    return  Encoding.UTF8.GetString(data);
+                case CharacterSet.ASCII:
+                    return Encoding.ASCII.GetString(data);
+                case CharacterSet.UNICODE:
+                    return Encoding.Unicode.GetString(data);
+                default:
+                    return null;
+        }
+        #endregion
     }
 }
