@@ -140,6 +140,13 @@
         /// <param name="value"></param>
         /// <returns></returns>
         public static string InQuotes(this string value) => $"\"{value}\"";
+
+        /// <summary>
+        /// Is value even
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool IsEven(this int value) => value % 2 == 0;
         #endregion
     }
 }

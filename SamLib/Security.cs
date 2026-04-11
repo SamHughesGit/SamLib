@@ -92,7 +92,7 @@ namespace SamLib.Security
         }
     }
 
-    public static class Util
+    public static class SecurityUtil
     {
         // Generate unique token for linking Tcp and Udp connections
         private const string Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!£$%^&*()-=+_[]{}<>,.?";
