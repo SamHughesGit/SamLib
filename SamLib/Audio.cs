@@ -19,6 +19,8 @@ namespace SamLib.Audio
         /// </summary>
         public void Play(string id)
         {
+            if (string.IsNullOrWhiteSpace(id)) return;
+
             if (_sourceRegistry.TryGetValue(id, out var playAction))
                 playAction(id);
             else
@@ -30,7 +32,9 @@ namespace SamLib.Audio
         /// </summary>
         public void Play(string id, string filePath)
         {
-            _sourceRegistry[id] = (sid) => Play(sid, filePath);
+            if (!string.IsNullOrWhiteSpace(id))
+                _sourceRegistry[id] = (sid) => Play(sid, filePath);
+
             var stream = new AudioFileReader(filePath);
             StartPlayback(id, stream);
         }
@@ -40,7 +44,9 @@ namespace SamLib.Audio
         /// </summary>
         public void Play(string id, Uri url)
         {
-            _sourceRegistry[id] = (sid) => Play(sid, url);
+            if (!string.IsNullOrWhiteSpace(id))
+                _sourceRegistry[id] = (sid) => Play(sid, url);
+
             var stream = new MediaFoundationReader(url.ToString());
             StartPlayback(id, stream);
         }
@@ -50,7 +56,9 @@ namespace SamLib.Audio
         /// </summary>
         public void PlayURL(string id, string url)
         {
-            _sourceRegistry[id] = (sid) => PlayURL(sid, url);
+            if (!string.IsNullOrWhiteSpace(id))
+                _sourceRegistry[id] = (sid) => PlayURL(sid, url);
+
             var stream = new MediaFoundationReader(url);
             StartPlayback(id, stream);
         }
@@ -61,7 +69,9 @@ namespace SamLib.Audio
         public void Play(string id, Stream audioStream, bool isMp3 = false)
         {
             var ms = EnsureRepeatableStream(audioStream);
-            _sourceRegistry[id] = (sid) => Play(sid, ms, isMp3);
+
+            if (!string.IsNullOrWhiteSpace(id))
+                _sourceRegistry[id] = (sid) => Play(sid, ms, isMp3);
 
             ms.Position = 0;
             WaveStream stream = isMp3 ? new Mp3FileReader(ms) : new WaveFileReader(ms);
@@ -73,7 +83,9 @@ namespace SamLib.Audio
         /// </summary>
         public void Play(string id, string resourceName, Assembly assembly, bool isMp3 = false)
         {
-            _sourceRegistry[id] = (sid) => Play(sid, resourceName, assembly, isMp3);
+            if (!string.IsNullOrWhiteSpace(id))
+                _sourceRegistry[id] = (sid) => Play(sid, resourceName, assembly, isMp3);
+
             InternalPlayResource(id, resourceName, assembly, isMp3);
         }
 
