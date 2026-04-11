@@ -3,7 +3,7 @@
     using System.Diagnostics;
     using System.Globalization;
 
-    static class Util
+    public static class Util
     {
         /// <summary>
         /// Log a message with the time and date
