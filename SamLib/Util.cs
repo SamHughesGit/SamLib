@@ -9,9 +9,10 @@
         /// Log a message with the time and date
         /// </summary>
         /// <param name="text"></param>
-        public static void Log(string text)
+        /// <param name="precise">Whether to include milliseconds in the timestamp</param>
+        public static void Log(string text, bool precise = false)
         {
-            string time = DateTime.Now.ToString("hh:mm:ss");
+            string time = precise ? DateTime.Now.ToString("hh:mm:ss:ffff") : DateTime.Now.ToString("hh:mm:ss");
             string date = DateTime.Now.ToString("dd/MM/yyyy");
             Console.WriteLine($"[{date}][{time}]: {text}");
         }
