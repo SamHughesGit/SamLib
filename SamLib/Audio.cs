@@ -91,6 +91,59 @@ namespace SamLib.Audio
 
         #endregion
 
+        #region Registration
+
+        /// <summary>
+        /// Registers a file path to an ID for later playback.
+        /// </summary>
+        public void Register(string id, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+            _sourceRegistry[id] = (sid) => Play(sid, filePath);
+        }
+
+        /// <summary>
+        /// Registers a URL (Uri) to an ID for later playback.
+        /// </summary>
+        public void Register(string id, Uri url)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+            _sourceRegistry[id] = (sid) => Play(sid, url);
+        }
+
+        /// <summary>
+        /// Registers a URL (string) to an ID for later playback.
+        /// </summary>
+        public void RegisterURL(string id, string url)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+            _sourceRegistry[id] = (sid) => PlayURL(sid, url);
+        }
+
+        /// <summary>
+        /// Registers a Stream to an ID for later playback.
+        /// </summary>
+        public void Register(string id, Stream audioStream, bool isMp3 = false)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+
+            // Buffer the stream into memory immediately during registration 
+            // so the caller can safely dispose of their original stream.
+            var ms = EnsureRepeatableStream(audioStream);
+            _sourceRegistry[id] = (sid) => Play(sid, ms, isMp3);
+        }
+
+        /// <summary>
+        /// Registers an embedded resource to an ID for later playback.
+        /// </summary>
+        public void Register(string id, string resourceName, Assembly assembly, bool isMp3 = false)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return;
+            _sourceRegistry[id] = (sid) => Play(sid, resourceName, assembly, isMp3);
+        }
+
+        #endregion
+
         #region Playback Control
         private void StartPlayback(string id, WaveStream stream)
         {
