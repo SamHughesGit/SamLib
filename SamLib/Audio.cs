@@ -5,6 +5,7 @@ namespace SamLib.Audio
 {
     public class AudioPlayer : IDisposable
     {
+        #region Data
         private class ChannelData
         {
             public float Volume { get; set; } = 1.0f;
@@ -23,6 +24,7 @@ namespace SamLib.Audio
         private readonly Dictionary<string, Action<string, string>> _sourceRegistry = new();
 
         public event EventHandler<string> PlaybackStopped;
+        #endregion
 
         #region Channel Management
 
@@ -109,66 +111,59 @@ namespace SamLib.Audio
 
         #region Players
 
-        /// <summary>
-        /// Replays a previously registered sound by ID on a specific channel.
-        /// </summary>
         public void Play(string id, string channelId = "Master")
         {
             if (string.IsNullOrWhiteSpace(id)) return;
-
             if (_sourceRegistry.TryGetValue(id, out var playAction))
                 playAction(id, channelId);
             else
                 throw new KeyNotFoundException($"No sound source registered for ID: {id}");
         }
 
-        // The rest both play the sound, and register it for future replay by ID. If ID is null/empty, just play without registering.
-
-        public void Play(string id, string filePath, string channelId = "Master")
+        public void Play(string id, string filePath, string channelId = "Master", float volume = 1.0f, bool loop = false)
         {
             if (!string.IsNullOrWhiteSpace(id))
-                _sourceRegistry[id] = (sid, cid) => Play(sid, filePath, cid);
+                _sourceRegistry[id] = (sid, cid) => Play(sid, filePath, cid, volume, loop);
 
             var stream = new AudioFileReader(filePath);
-            StartPlayback(id, channelId, stream);
+            StartPlayback(id, channelId, stream, volume, loop);
         }
 
-        public void Play(string id, Uri url, string channelId = "Master")
+        public void Play(string id, Uri url, string channelId = "Master", float volume = 1.0f, bool loop = false)
         {
             if (!string.IsNullOrWhiteSpace(id))
-                _sourceRegistry[id] = (sid, cid) => Play(sid, url, cid);
+                _sourceRegistry[id] = (sid, cid) => Play(sid, url, cid, volume, loop);
 
             var stream = new MediaFoundationReader(url.ToString());
-            StartPlayback(id, channelId, stream);
+            StartPlayback(id, channelId, stream, volume, loop);
         }
 
-        public void PlayURL(string id, string url, string channelId = "Master")
+        public void PlayURL(string id, string url, string channelId = "Master", float volume = 1.0f, bool loop = false)
         {
             if (!string.IsNullOrWhiteSpace(id))
-                _sourceRegistry[id] = (sid, cid) => PlayURL(sid, url, cid);
+                _sourceRegistry[id] = (sid, cid) => PlayURL(sid, url, cid, volume, loop);
 
             var stream = new MediaFoundationReader(url);
-            StartPlayback(id, channelId, stream);
+            StartPlayback(id, channelId, stream, volume, loop);
         }
 
-        public void Play(string id, Stream audioStream, bool isMp3 = false, string channelId = "Master")
+        public void Play(string id, Stream audioStream, bool isMp3 = false, string channelId = "Master", float volume = 1.0f, bool loop = false)
         {
             var ms = EnsureRepeatableStream(audioStream);
-
             if (!string.IsNullOrWhiteSpace(id))
-                _sourceRegistry[id] = (sid, cid) => Play(sid, ms, isMp3, cid);
+                _sourceRegistry[id] = (sid, cid) => Play(sid, ms, isMp3, cid, volume, loop);
 
             ms.Position = 0;
             WaveStream stream = isMp3 ? new Mp3FileReader(ms) : new WaveFileReader(ms);
-            StartPlayback(id, channelId, stream);
+            StartPlayback(id, channelId, stream, volume, loop);
         }
 
-        public void Play(string id, string resourceName, Assembly assembly, bool isMp3 = false, string channelId = "Master")
+        public void Play(string id, string resourceName, Assembly assembly, bool isMp3 = false, string channelId = "Master", float volume = 1.0f, bool loop = false)
         {
             if (!string.IsNullOrWhiteSpace(id))
-                _sourceRegistry[id] = (sid, cid) => Play(sid, resourceName, assembly, isMp3, cid);
+                _sourceRegistry[id] = (sid, cid) => Play(sid, resourceName, assembly, isMp3, cid, volume, loop);
 
-            InternalPlayResource(id, channelId, resourceName, assembly, isMp3);
+            InternalPlayResource(id, channelId, resourceName, assembly, isMp3, volume, loop);
         }
 
         #endregion
@@ -209,23 +204,23 @@ namespace SamLib.Audio
         #endregion
 
         #region Playback Control
-        private void StartPlayback(string id, string channelId, WaveStream stream)
+        private void StartPlayback(string id, string channelId, WaveStream stream, float volume, bool loop)
         {
             Stop(id);
-
-            // Ensure channel exists before getting its volume
             CreateChannel(channelId);
 
+            // Wrap the stream if looped
+            WaveStream finalStream = loop ? new LoopStream(stream) : stream;
+
             var outputDevice = new WaveOutEvent();
-            outputDevice.Init(stream);
+            outputDevice.Init(finalStream);
             outputDevice.PlaybackStopped += (s, e) => OnInternalPlaybackStopped(id);
 
             float channelVol = GetChannelVolume(channelId);
-            float baseVol = 1.0f;
-            outputDevice.Volume = System.Math.Clamp(baseVol * channelVol, 0f, 1f);
+            outputDevice.Volume = System.Math.Clamp(volume * channelVol, 0f, 1f);
 
             lock (_activeSounds)
-                _activeSounds[id] = (outputDevice, stream, channelId, baseVol);
+                _activeSounds[id] = (outputDevice, finalStream, channelId, volume);
 
             outputDevice.Play();
         }
@@ -264,14 +259,12 @@ namespace SamLib.Audio
         }
         #endregion
 
-
-
         #region Helpers
-        private void InternalPlayResource(string id, string channelId, string name, Assembly assembly, bool isMp3)
+        private void InternalPlayResource(string id, string channelId, string name, Assembly assembly, bool isMp3, float volume, bool loop)
         {
             Stream resStream = assembly.GetManifestResourceStream(name);
             if (resStream == null) throw new ArgumentException($"Resource '{name}' not found.");
-            Play(id, resStream, isMp3, channelId);
+            Play(id, resStream, isMp3, channelId, volume, loop);
         }
 
         private MemoryStream EnsureRepeatableStream(Stream input)
@@ -323,5 +316,37 @@ namespace SamLib.Audio
             _channels.Clear();
         }
         #endregion
+    }
+
+    public class LoopStream : WaveStream
+    {
+        private readonly WaveStream _sourceStream;
+        public bool EnableLooping { get; set; } = true;
+
+        public LoopStream(WaveStream sourceStream) => _sourceStream = sourceStream;
+
+        public override WaveFormat WaveFormat => _sourceStream.WaveFormat;
+        public override long Length => _sourceStream.Length;
+        public override long Position
+        {
+            get => _sourceStream.Position;
+            set => _sourceStream.Position = value;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int totalBytesRead = 0;
+            while (totalBytesRead < count)
+            {
+                int bytesRead = _sourceStream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
+                if (bytesRead == 0)
+                {
+                    if (_sourceStream.Position == 0 || !EnableLooping) break;
+                    _sourceStream.Position = 0;
+                }
+                totalBytesRead += bytesRead;
+            }
+            return totalBytesRead;
+        }
     }
 }
