@@ -111,7 +111,7 @@ namespace SamLib.Audio
         }
 
         #endregion
-
+        // Play sounds (and register if first time), to not cache, leave id empty
         #region Players
 
         public void Play(string id, string channelId = "Master", bool allowOverlap = false)
@@ -175,7 +175,7 @@ namespace SamLib.Audio
         }
 
         #endregion
-
+        // Register sounds
         #region Registration
         public void Register(string id, string filePath, string defaultChannel = "Master")
         {

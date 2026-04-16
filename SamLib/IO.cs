@@ -212,7 +212,16 @@
 
             return index;
         }
-
+        /// <summary>
+        /// Drop down multi-select with colored selection
+        /// </summary>
+        /// <param name="prompt">promp</param>
+        /// <param name="options">array of options</param>
+        /// <param name="color">selected option color</param>
+        /// <param name="minSelected">min selected items</param>
+        /// <param name="delay">text-animation delay</param>
+        /// <param name="selectedIdentifier">select index identifier</param>
+        /// <returns>Selected options</returns>
         public static string[] DropDownMultiSelectMin(string prompt, string[] options, ConsoleColor color, int minSelected = 1,  int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
@@ -283,6 +292,15 @@
             }
             return result.ToArray();
         }
+        /// <summary>
+        /// Drop down multi-select with minimum amounts
+        /// </summary>
+        /// <param name="prompt">prompt</param>
+        /// <param name="options">array of options</param>
+        /// <param name="minSelected">min elements to select</param>
+        /// <param name="delay">text animation delay</param>
+        /// <param name="selectedIdentifier">selected index identifier</param>
+        /// <returns>array of selected options</returns>
         public static string[] DropDownMultiSelectMin(string prompt, string[] options, int minSelected = 1, int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
@@ -346,6 +364,17 @@
             }
             return result.ToArray();
         }
+        /// <summary>
+        /// Multi-select dropdown with min and max and color
+        /// </summary>
+        /// <param name="prompt"></param>
+        /// <param name="options"></param>
+        /// <param name="color"></param>
+        /// <param name="minSelected"></param>
+        /// <param name="maxSelected"></param>
+        /// <param name="delay"></param>
+        /// <param name="selectedIdentifier"></param>
+        /// <returns></returns>
         public static string[] DropDownMultiSelectMax(string prompt, string[] options, ConsoleColor color, int minSelected = 1, int maxSelected = 2, int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
@@ -415,6 +444,16 @@
 
             return options.Where((item, idx) => selectedStatus[idx]).ToArray();
         }
+        /// <summary>
+        /// Multi-select dropdown with min and max
+        /// </summary>
+        /// <param name="prompt"></param>
+        /// <param name="options"></param>
+        /// <param name="minSelected"></param>
+        /// <param name="maxSelected"></param>
+        /// <param name="delay"></param>
+        /// <param name="selectedIdentifier"></param>
+        /// <returns></returns>
         public static string[] DropDownMultiSelectMax(string prompt, string[] options, int minSelected = 1, int maxSelected = 2, int delay = 90, string selectedIdentifier = ">")
         {
             int index = 0;
