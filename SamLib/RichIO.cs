@@ -1,3 +1,5 @@
+﻿using System.Text.RegularExpressions;
+
 namespace SamLib.RichIO
 {
     public static class IO
@@ -58,7 +60,7 @@ namespace SamLib.RichIO
             // --- Other ---
             { "[reset]",     "\x1b[0m" } // Reset all effects
         };
-        private static string punctuation = ".,!?;:";   
+        private static string punctuation = ".,!?;:";
 
         public static void TypeRich(string message, int delay = 50, bool newLine = true, bool hideCursor = true, bool doPunctiationDelay = true, float punctionationDelayMultiplier = 1.5f)
         {
@@ -87,15 +89,42 @@ namespace SamLib.RichIO
                 Console.Write(message[i]);
 
                 // Handle timing
-                if (punctuation.Contains(message[i]) && doPunctiationDelay) 
+                if (punctuation.Contains(message[i]) && doPunctiationDelay)
                     Thread.Sleep((int)(delay * punctionationDelayMultiplier));
-                else 
+                else
                     Thread.Sleep(delay);
             }
 
             if (newLine) Console.WriteLine();
             Console.Write("\x1b[0m"); // Reset all effects
             Console.CursorVisible = cursorVisibility;
+        }
+
+        public static void WriteRich(string message, bool newLine = true)
+        {
+            for (int i = 0; i < message.Length; i++)
+            {
+                // Check if the current character starts a tag
+                if (message[i] == '[')
+                {
+                    int closingBracket = message.IndexOf(']', i);
+                    if (closingBracket != -1)
+                    {
+                        string tag = message.Substring(i, closingBracket - i + 1);
+                        if (Tags.ContainsKey(tag))
+                        {
+                            Console.Write(Tags[tag]); // Apply style
+                            i = closingBracket;       // Skip the tag in the loop
+                            continue;
+                        }
+                    }
+                }
+
+                Console.Write(message[i]);
+            }
+
+            if (newLine) Console.WriteLine();
+            Console.Write("\x1b[0m");
         }
 
         public static string GetOptionDropdown(string prompt, string[] options, int delay = 90, string selectedIdentifier = ">", bool colored = false, ConsoleColor color = ConsoleColor.Cyan)
@@ -107,7 +136,7 @@ namespace SamLib.RichIO
             ConsoleColor baseColor = Console.ForegroundColor;
 
             Console.SetCursorPosition(0, cursorY);
-            if (delay <= 0) { Console.Write($"{prompt}\n"); } else { TypeRich(prompt, delay); }
+            if (delay <= 0) { WriteRich($"{prompt}"); } else { TypeRich(prompt, delay); }
 
             for (int i = 0; i < options.Length; i++)
             {
@@ -115,7 +144,7 @@ namespace SamLib.RichIO
                 string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
                 string text = $"{head} {options[i]}\n";
                 if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
-                if (delay <= 0) Console.Write(text);
+                if (delay <= 0) WriteRich(text, false);
                 else TypeRich(text, 90, false);
             }
 
@@ -123,7 +152,7 @@ namespace SamLib.RichIO
             {
                 if (colored) Console.ForegroundColor = baseColor;
                 Console.SetCursorPosition(0, cursorY);
-                Console.Write($"{prompt}\n");
+                WriteRich($"{prompt}");
 
                 for (int i = 0; i < options.Length; i++)
                 {
@@ -131,7 +160,7 @@ namespace SamLib.RichIO
                     string head = activeElement ? $"{selectedIdentifier} " : $"{string.Concat(Enumerable.Repeat(" ", selectedIdentifier.Length))} ";
                     string text = $"{head} {options[i]}\n";
                     if (colored) Console.ForegroundColor = activeElement ? color : baseColor;
-                    Console.Write(text);
+                    WriteRich(text, false);
                 }
 
                 ConsoleKeyInfo key = Console.ReadKey(true);
@@ -139,14 +168,14 @@ namespace SamLib.RichIO
                 if (key.Key == ConsoleKey.UpArrow || key.Key == ConsoleKey.W)
                 {
                     index--;
-                    if(index < 0) { index = options.Length - 1; }
+                    if (index < 0) { index = options.Length - 1; }
                 }
                 else if (key.Key == ConsoleKey.DownArrow || key.Key == ConsoleKey.S)
                 {
                     index++;
                     if (index > options.Length - 1) { index = 0; }
                 }
-                else if(key.Key == ConsoleKey.Enter) { selected = true; }
+                else if (key.Key == ConsoleKey.Enter) { selected = true; }
             }
 
             return options[index];
